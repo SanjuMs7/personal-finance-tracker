@@ -1,65 +1,81 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
-import '@/global.css';
-
-import { Platform } from 'react-native';
-
-export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
+export const Radius = {
+  sm: 12,
+  md: 16,
+  lg: 20,
+  xl: 24,
+  pill: 999,
 } as const;
-
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
 
 export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+/** Category chart / avatar palette, cycled by category order. */
+export const CATEGORY_PALETTE = [
+  '#3A5CFF',
+  '#16C098',
+  '#F5A623',
+  '#FF6B6B',
+  '#8B5CF6',
+  '#22B8CF',
+  '#F472B6',
+  '#64748B',
+];
+
+export const LightColors = {
+  bg: '#F5F6FA',
+  surface: '#FFFFFF',
+  surfaceAlt: '#EFF1F7',
+  sheetBg: '#FFFFFF',
+  textPrimary: '#14171F',
+  textSecondary: '#7C818F',
+  border: '#E7E9F0',
+  handle: '#DEE1EA',
+  primary: '#3A5CFF',
+  primarySoft: '#E9EDFF',
+  trackColor: '#EDEFF5',
+  navBg: 'rgba(255,255,255,0.94)',
+  warning: '#F5A623',
+  warningSoft: '#FDF1DD',
+  warningText: '#B9790C',
+  danger: '#EF4444',
+  dangerSoft: '#FDEAEA',
+  excelColor: '#1E9E63',
+  excelSoft: '#E4F7ED',
+};
+
+export const DarkColors = {
+  bg: '#0D0F16',
+  surface: '#171A23',
+  surfaceAlt: '#1F2330',
+  sheetBg: '#1B1E29',
+  textPrimary: '#F4F5F9',
+  textSecondary: '#8B90A0',
+  border: '#272B38',
+  handle: '#333949',
+  primary: '#6C87FF',
+  primarySoft: '#232A4D',
+  trackColor: '#242836',
+  navBg: 'rgba(23,26,35,0.9)',
+  warning: '#FBBF24',
+  warningSoft: '#332A14',
+  warningText: '#FBBF24',
+  danger: '#F87171',
+  dangerSoft: '#3A1E1E',
+  excelColor: '#3FCB84',
+  excelSoft: '#173425',
+};
+
+export type ThemeColors = typeof LightColors;
+
+/** Budget status thresholds, centralized so they can be tuned in one place. */
+export const BUDGET_THRESHOLDS = {
+  warning: 80,
+  danger: 100,
+};
