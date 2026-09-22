@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, type StyleProp, type ViewStyle } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
 import { Radius } from '@/constants/theme';
@@ -13,22 +13,33 @@ interface PrimaryButtonProps {
 
 export function PrimaryButton({ label, onPress, disabled, style }: PrimaryButtonProps) {
   const { colors } = useTheme();
+
+  // Every visual property sits in one inline object rather than a StyleSheet
+  // entry merged with overrides: a split backgroundColor was dropping out on
+  // Android, leaving white label text on an unpainted button.
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        { backgroundColor: colors.primary, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 },
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      android_ripple={disabled ? undefined : { color: 'rgba(255,255,255,0.24)' }}
+      style={[
+        {
+          alignSelf: 'stretch',
+          borderRadius: Radius.md,
+          paddingVertical: 15,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          backgroundColor: disabled ? colors.buttonDisabled : colors.primary,
+        },
         style,
       ]}
     >
-      <AppText weight="bold" style={styles.label}>{label}</AppText>
+      <AppText weight="bold" style={{ fontSize: 14.5, color: disabled ? colors.textSecondary : '#FFFFFF' }}>
+        {label}
+      </AppText>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  btn: { borderRadius: Radius.md, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
-  label: { color: '#fff', fontSize: 14.5 },
-});

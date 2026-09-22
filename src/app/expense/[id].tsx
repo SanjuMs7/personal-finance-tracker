@@ -4,15 +4,13 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
 import { BottomSheet } from '@/components/common/BottomSheet';
-import { CategoryPickerSheet } from '@/components/common/CategoryPickerSheet';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { DateTimeField } from '@/components/common/DateTimeField';
 import { Icon } from '@/components/common/Icon';
-import { IconPickerSheet } from '@/components/common/IconPickerSheet';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForCategoryIndex } from '@/lib/calculations/budget';
+import { colorForIcon } from '@/lib/calculations/budget';
 import { formatMoneyInput } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
 import type { IconKey } from '@/types';
@@ -37,17 +35,16 @@ export default function ExpenseFormScreen() {
 
   const [name, setName] = useState(existing?.name ?? '');
   const [amountText, setAmountText] = useState(existing ? formatMoneyInput(existing.amount) : '');
-  const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? categories[0]?.id ?? null);
-  const [icon, setIcon] = useState<IconKey>(existing?.icon ?? categories[0]?.icon ?? 'other');
+  const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null);
   const [date, setDate] = useState(existing ? new Date(existing.expenseDate) : new Date());
 
-  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [categoryListOpen, setCategoryListOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const selectedCategoryIndex = categories.findIndex((c) => c.id === categoryId);
-  const selectedCategory = categories[selectedCategoryIndex];
-  const chipColor = selectedCategory ? colorForCategoryIndex(selectedCategoryIndex) : colors.textSecondary;
+  const selectedCategory = categories.find((c) => c.id === categoryId);
+  // Icon and colour are the category's; an expense has none of its own.
+  const icon: IconKey = selectedCategory?.icon ?? 'other';
+  const chipColor = selectedCategory ? colorForIcon(icon) : colors.textSecondary;
 
   const amountValue = parseFloat(amountText);
   const isValid = name.trim().length > 0 && !Number.isNaN(amountValue) && amountValue > 0 && !!categoryId;
@@ -77,7 +74,21 @@ export default function ExpenseFormScreen() {
 
   return (
     <>
-      <BottomSheet visible onClose={close} maxHeight="82%">
+      <BottomSheet
+        visible
+        onClose={close}
+        maxHeight="88%"
+        footer={
+          <>
+            <PrimaryButton label={isNew ? 'Add Expense' : 'Save Changes'} onPress={handleSave} disabled={!isValid} />
+            {!isNew && (
+              <Pressable onPress={() => setDeleteOpen(true)} style={styles.deleteBtn}>
+                <AppText weight="bold" style={{ fontSize: 13.5, color: colors.danger }}>Delete Expense</AppText>
+              </Pressable>
+            )}
+          </>
+        }
+      >
         <View style={styles.header}>
           <AppText weight="extrabold" style={{ fontSize: 17, color: colors.textPrimary }}>
             {isNew ? 'Add Expense' : 'Edit Expense'}
@@ -115,9 +126,12 @@ export default function ExpenseFormScreen() {
             />
           </View>
 
-          <View style={styles.row}>
+          <View>
+            <AppText weight="semibold" style={{ fontSize: 12.5, color: colors.textSecondary, marginBottom: 6 }}>Category</AppText>
             <Pressable
-              onPress={() => setCategoryPickerOpen(true)}
+              onPress={() => setCategoryListOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel="Choose category"
               style={[styles.categoryBtn, { backgroundColor: colors.surfaceAlt }]}
             >
               <View style={[styles.smallIcon, { backgroundColor: chipColor + '22' }]}>
@@ -126,13 +140,44 @@ export default function ExpenseFormScreen() {
               <AppText weight="bold" numberOfLines={1} style={{ flex: 1, fontSize: 13.5, color: colors.textPrimary }}>
                 {selectedCategory?.name ?? 'Select category'}
               </AppText>
+              <AppText weight="bold" style={{ fontSize: 12, color: colors.textSecondary }}>
+                {categoryListOpen ? 'Close' : 'Change'}
+              </AppText>
             </Pressable>
-            <Pressable
-              onPress={() => setIconPickerOpen(true)}
-              style={[styles.iconBtn, { backgroundColor: colors.surfaceAlt }]}
-            >
-              <Icon name={icon} color={colors.textPrimary} size={18} />
-            </Pressable>
+
+            {categoryListOpen ? (
+              <View style={styles.categoryList}>
+                {categories.length === 0 ? (
+                  <AppText style={{ fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, textAlign: 'center' }}>
+                    No categories yet. Add one in the Limits tab first.
+                  </AppText>
+                ) : (
+                  categories.map((category) => {
+                    const catColor = colorForIcon(category.icon);
+                    const active = category.id === categoryId;
+                    return (
+                      <Pressable
+                        key={category.id}
+                        onPress={() => {
+                          setCategoryId(category.id);
+                          setCategoryListOpen(false);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={category.name}
+                        style={[styles.categoryRow, { backgroundColor: active ? colors.primarySoft : 'transparent' }]}
+                      >
+                        <View style={[styles.smallIcon, { backgroundColor: catColor + '22' }]}>
+                          <Icon name={category.icon} color={catColor} size={14} />
+                        </View>
+                        <AppText weight="bold" numberOfLines={1} style={{ flex: 1, fontSize: 13.5, color: colors.textPrimary }}>
+                          {category.name}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.field}>
@@ -140,28 +185,8 @@ export default function ExpenseFormScreen() {
             <DateTimeField value={date} onChange={setDate} />
           </View>
 
-          <PrimaryButton label={isNew ? 'Add Expense' : 'Save Changes'} onPress={handleSave} disabled={!isValid} />
-
-          {!isNew && (
-            <Pressable onPress={() => setDeleteOpen(true)} style={styles.deleteBtn}>
-              <AppText weight="bold" style={{ fontSize: 13.5, color: colors.danger }}>Delete Expense</AppText>
-            </Pressable>
-          )}
         </View>
       </BottomSheet>
-
-      <CategoryPickerSheet
-        visible={categoryPickerOpen}
-        onClose={() => setCategoryPickerOpen(false)}
-        categories={categories}
-        selectedId={categoryId}
-        onSelect={(category) => {
-          setCategoryId(category.id);
-          setIcon(category.icon);
-        }}
-      />
-
-      <IconPickerSheet visible={iconPickerOpen} onClose={() => setIconPickerOpen(false)} selected={icon} onSelect={setIcon} />
 
       <ConfirmDialog
         visible={deleteOpen}
@@ -183,9 +208,9 @@ const styles = StyleSheet.create({
   amountInput: { minWidth: 140, fontSize: 38, fontFamily: 'PlusJakartaSans_800ExtraBold', textAlign: 'center', padding: 0 },
   field: { gap: 0 },
   textInput: { width: '100%', paddingVertical: 13, paddingHorizontal: 14, borderRadius: Radius.md, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold' },
-  row: { flexDirection: 'row', gap: Spacing.sm },
+  categoryList: { marginTop: Spacing.sm, gap: 2 },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: 8, borderRadius: Radius.md },
   categoryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 12, paddingHorizontal: 12, borderRadius: Radius.md },
   smallIcon: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  iconBtn: { width: 52, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.md },
-  deleteBtn: { alignItems: 'center', paddingTop: 2 },
+  deleteBtn: { alignItems: 'center', paddingTop: Spacing.sm, paddingBottom: Spacing.sm },
 });

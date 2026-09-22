@@ -24,3 +24,19 @@ export function formatFriendlyDate(timestamp: number): string {
   }
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
 }
+
+/** 'Today' / 'Yesterday' / '14 · Sep'. Takes `now` so it stays pure. */
+export function formatDateGroupLabel(timestamp: number, now: number): string {
+  const d = new Date(timestamp);
+  const ref = new Date(now);
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  if (sameDay(d, ref)) return 'Today';
+
+  const yesterday = new Date(ref);
+  yesterday.setDate(ref.getDate() - 1);
+  if (sameDay(d, yesterday)) return 'Yesterday';
+
+  return `${d.getDate().toString().padStart(2, '0')} · ${d.toLocaleDateString('en-IN', { month: 'short' })}`;
+}

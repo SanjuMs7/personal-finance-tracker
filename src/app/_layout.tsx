@@ -14,6 +14,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '@/components/common/AppText';
@@ -81,24 +82,26 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SQLiteProvider
-        databaseName="pft.db"
-        onInit={migrateDbIfNeeded}
-        onError={(err) => {
-          console.warn('Failed to initialize database', err);
-          SplashScreen.hideAsync().catch(() => {});
-          setDbError(err);
-        }}
-      >
-        <Hydrator onError={setDbError}>
-          <ThemedStatusBar />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="expense/[id]" options={{ presentation: 'transparentModal', animation: 'fade' }} />
-            <Stack.Screen name="category/[id]" options={{ presentation: 'transparentModal', animation: 'fade' }} />
-          </Stack>
-        </Hydrator>
-      </SQLiteProvider>
+      <KeyboardProvider>
+        <SQLiteProvider
+          databaseName="pft.db"
+          onInit={migrateDbIfNeeded}
+          onError={(err) => {
+            console.warn('Failed to initialize database', err);
+            SplashScreen.hideAsync().catch(() => {});
+            setDbError(err);
+          }}
+        >
+          <Hydrator onError={setDbError}>
+            <ThemedStatusBar />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="expense/[id]" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+              <Stack.Screen name="category/[id]" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+            </Stack>
+          </Hydrator>
+        </SQLiteProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

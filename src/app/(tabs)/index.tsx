@@ -10,8 +10,8 @@ import { Icon } from '@/components/common/Icon';
 import { SemiDonutChart, type ChartSegment } from '@/components/charts/SemiDonutChart';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForCategoryIndex, isSameMonth, totalSpending } from '@/lib/calculations/budget';
-import { formatFriendlyTime, isToday } from '@/lib/formatting/datetime';
+import { colorForIcon, isSameMonth, totalSpending } from '@/lib/calculations/budget';
+import { formatDateGroupLabel, formatFriendlyTime } from '@/lib/formatting/datetime';
 import { formatMoney } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -58,34 +58,45 @@ export default function HomeScreen() {
     const byCategory = new Map<string, number>();
     monthExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
     return categories
-      .map((c, index) => ({ key: c.id, value: byCategory.get(c.id) ?? 0, color: colorForCategoryIndex(index) }))
+      .map((c) => ({ key: c.id, value: byCategory.get(c.id) ?? 0, color: colorForIcon(c.icon) }))
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
   }, [categories, monthExpenses]);
 
-  const todayRows = useMemo(() => {
-    return expenses
-      .filter((e) => isToday(e.expenseDate))
+  // Grouped by day, newest first, so nothing is hidden just for not being today.
+  const sections = useMemo(() => {
+    const rows = [...expenses]
       .sort((a, b) => b.expenseDate - a.expenseDate)
       .map((e) => {
-        const index = categories.findIndex((c) => c.id === e.categoryId);
-        const category = categories[index];
-        const color = category ? colorForCategoryIndex(index) : colors.textSecondary;
+        const category = categories.find((c) => c.id === e.categoryId);
+        const color = category ? colorForIcon(category.icon) : colors.textSecondary;
         return {
           id: e.id,
+          expenseDate: e.expenseDate,
           name: e.name,
           amountDisplay: formatMoney(e.amount),
           categoryName: category?.name ?? 'Uncategorized',
           time: formatFriendlyTime(e.expenseDate),
-          icon: e.icon,
+          icon: category?.icon ?? ('other' as const),
           iconColor: color,
           iconBg: color + '22',
         };
       });
-  }, [expenses, categories, colors.textSecondary]);
+
+    const groups: { key: string; label: string; rows: typeof rows }[] = [];
+    rows.forEach((row) => {
+      const key = new Date(row.expenseDate).toDateString();
+      const last = groups[groups.length - 1];
+      if (last && last.key === key) {
+        last.rows.push(row);
+      } else {
+        groups.push({ key, label: formatDateGroupLabel(row.expenseDate, monthAnchor), rows: [row] });
+      }
+    });
+    return groups;
+  }, [expenses, categories, colors.textSecondary, monthAnchor]);
 
   const hasAnyExpenses = expenses.length > 0;
-  const hasTodayExpenses = todayRows.length > 0;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
@@ -115,45 +126,56 @@ export default function HomeScreen() {
               />
             </View>
 
-            <AppText weight="bold" style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Today&apos;s Expenses
-            </AppText>
+            <View style={styles.sectionRow}>
+              <AppText weight="bold" style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+                Expenses
+              </AppText>
+              <Pressable
+                onPress={() => router.push({ pathname: '/expense/[id]', params: { id: 'new' } })}
+                accessibilityRole="button"
+                accessibilityLabel="Add expense"
+                android_ripple={{ color: 'rgba(255,255,255,0.24)' }}
+                style={[styles.addBtn, { backgroundColor: colors.primary, overflow: 'hidden' }]}
+              >
+                <PlusGlyph color="#fff" />
+              </Pressable>
+            </View>
 
-            {hasTodayExpenses ? (
-              <View style={{ gap: Spacing.sm }}>
-                {todayRows.map((row) => (
-                  <Pressable
-                    key={row.id}
-                    onPress={() => router.push({ pathname: '/expense/[id]', params: { id: row.id } })}
-                    style={({ pressed }) => [
-                      styles.expenseRow,
-                      { backgroundColor: colors.surface, shadowColor: colors.textPrimary, opacity: pressed ? 0.85 : 1 },
-                    ]}
-                  >
-                    <View style={[styles.expenseIcon, { backgroundColor: row.iconBg }]}>
-                      <Icon name={row.icon} color={row.iconColor} size={18} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <AppText weight="bold" numberOfLines={1} style={{ fontSize: 14.5, color: colors.textPrimary }}>
-                        {row.name}
-                      </AppText>
-                      <AppText style={{ fontSize: 12.5, color: colors.textSecondary, marginTop: 2 }}>
-                        {row.categoryName} · {row.time}
-                      </AppText>
-                    </View>
-                    <AppText weight="bold" style={{ fontSize: 15, color: colors.textPrimary }}>
-                      {row.amountDisplay}
-                    </AppText>
-                  </Pressable>
-                ))}
-              </View>
-            ) : (
-              <View style={[styles.noTodayCard, { backgroundColor: colors.surface, shadowColor: colors.textPrimary }]}>
-                <AppText weight="semibold" style={{ color: colors.textSecondary, fontSize: 14 }}>
-                  No expenses today
+            {sections.map((section) => (
+              <View key={section.key} style={styles.section}>
+                <AppText weight="bold" style={[styles.groupLabel, { color: colors.textSecondary }]}>
+                  {section.label}
                 </AppText>
+                <View style={{ gap: Spacing.sm }}>
+                  {section.rows.map((row) => (
+                    <Pressable
+                      key={row.id}
+                      onPress={() => router.push({ pathname: '/expense/[id]', params: { id: row.id } })}
+                      android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+                      style={[
+                        styles.expenseRow,
+                        { backgroundColor: colors.surface, shadowColor: colors.textPrimary, overflow: 'hidden' },
+                      ]}
+                    >
+                      <View style={[styles.expenseIcon, { backgroundColor: row.iconBg }]}>
+                        <Icon name={row.icon} color={row.iconColor} size={18} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <AppText weight="bold" numberOfLines={1} style={{ fontSize: 14.5, color: colors.textPrimary }}>
+                          {row.name}
+                        </AppText>
+                        <AppText style={{ fontSize: 12.5, color: colors.textSecondary, marginTop: 2 }}>
+                          {row.categoryName} · {row.time}
+                        </AppText>
+                      </View>
+                      <AppText weight="bold" style={{ fontSize: 15, color: colors.textPrimary }}>
+                        {row.amountDisplay}
+                      </AppText>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
-            )}
+            ))}
           </>
         ) : (
           <EmptyState
@@ -165,16 +187,6 @@ export default function HomeScreen() {
           />
         )}
       </ScrollView>
-
-      <Pressable
-        onPress={() => router.push({ pathname: '/expense/[id]', params: { id: 'new' } })}
-        style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: colors.primary, bottom: insets.bottom + 96, opacity: pressed ? 0.9 : 1 },
-        ]}
-      >
-        <PlusGlyph color="#fff" />
-      </Pressable>
     </View>
   );
 }
@@ -196,7 +208,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
-  sectionTitle: { fontSize: 15, marginBottom: Spacing.md },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
+  sectionTitle: { fontSize: 15 },
+  section: { marginBottom: Spacing.lg },
+  groupLabel: { fontSize: 12, letterSpacing: 0.3, marginBottom: Spacing.sm },
+  addBtn: { width: 34, height: 34, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
   expenseRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -218,19 +234,5 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
-  },
-  fab: {
-    position: 'absolute',
-    right: Spacing.xl,
-    width: 56,
-    height: 56,
-    borderRadius: Radius.xl - 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#3A5CFF',
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
   },
 });

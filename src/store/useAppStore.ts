@@ -14,7 +14,6 @@ interface AppState {
   hydrate: (database: SQLiteDatabase) => Promise<void>;
 
   addCategory: (input: { name: string; icon: IconKey; monthlyLimit: number | null }) => Promise<Category>;
-  addBlankCategory: () => Promise<Category>;
   updateCategory: (id: string, input: { name: string; icon: IconKey; monthlyLimit: number | null }) => Promise<void>;
   deleteCategorySimple: (id: string) => Promise<void>;
   deleteCategoryAndReassign: (id: string, targetCategoryId: string) => Promise<void>;
@@ -52,10 +51,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const category = await db.createCategory(database, input);
     set({ categories: [category, ...categories] });
     return category;
-  },
-
-  addBlankCategory: async () => {
-    return get().addCategory({ name: 'Other', icon: 'other', monthlyLimit: null });
   },
 
   updateCategory: async (id, input) => {

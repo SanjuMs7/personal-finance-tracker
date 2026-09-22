@@ -1,4 +1,4 @@
-import { Text, type TextProps } from 'react-native';
+import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
 type Weight = 'regular' | 'medium' | 'semibold' | 'bold' | 'extrabold';
 
@@ -15,5 +15,11 @@ interface AppTextProps extends TextProps {
 }
 
 export function AppText({ weight = 'regular', style, ...props }: AppTextProps) {
-  return <Text style={[{ fontFamily: FAMILY[weight] }, style]} {...props} />;
+  return <Text style={[styles.base, { fontFamily: FAMILY[weight] }, style]} {...props} />;
 }
+
+const styles = StyleSheet.create({
+  // Android pads custom fonts with the font's own ascent/descent, which pushes
+  // text off-centre inside buttons and icon chips.
+  base: Platform.OS === 'android' ? { includeFontPadding: false } : {},
+});

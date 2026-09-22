@@ -1,13 +1,19 @@
 export type IconKey =
   | 'food'
+  | 'groceries'
   | 'transport'
   | 'shopping'
   | 'home'
+  | 'rent'
   | 'entertainment'
   | 'bills'
   | 'travel'
   | 'coffee'
   | 'health'
+  | 'education'
+  | 'fitness'
+  | 'gift'
+  | 'savings'
   | 'other';
 
 export type ThemePreference = 'light' | 'dark' | 'system';

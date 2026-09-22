@@ -1,7 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { colorForCategoryIndex, withSpend } from '@/lib/calculations/budget';
+import { colorForIcon, withSpend } from '@/lib/calculations/budget';
 import { formatMoney } from '@/lib/formatting/money';
 import type { Category, Expense } from '@/types';
 
@@ -24,7 +24,7 @@ function buildReportHtml(categories: Category[], expenses: Expense[]): string {
   const generatedOn = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const spendByCategory = rows
-    .map((c, index) => ({ name: c.name, spent: c.spent, color: colorForCategoryIndex(index) }))
+    .map((c) => ({ name: c.name, spent: c.spent, color: colorForIcon(c.icon) }))
     .filter((c) => c.spent > 0)
     .sort((a, b) => b.spent - a.spent);
   const maxCategorySpend = Math.max(1, ...spendByCategory.map((c) => c.spent));

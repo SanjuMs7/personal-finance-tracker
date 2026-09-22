@@ -32,9 +32,9 @@ export function MoveCategoryDialog({
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
-      <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+    <Modal visible transparent statusBarTranslucent animationType="fade" onRequestClose={onCancel}>
+      <View style={[StyleSheet.absoluteFill, styles.backdrop]}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
         <View style={[styles.card, { backgroundColor: colors.sheetBg }]}>
           <AppText weight="extrabold" style={{ fontSize: 16, color: colors.textPrimary, marginBottom: 6 }}>
             Delete &quot;{categoryName}&quot;?
@@ -75,7 +75,7 @@ export function MoveCategoryDialog({
           <Pressable onPress={onCancel} style={styles.cancelBtn}>
             <AppText weight="bold" style={{ color: colors.textSecondary, fontSize: 13 }}>Cancel</AppText>
           </Pressable>
-        </View>
+      </View>
       </View>
     </Modal>
   );
@@ -87,6 +87,6 @@ const styles = StyleSheet.create({
   list: { maxHeight: 160, marginBottom: Spacing.lg },
   targetRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 8, borderRadius: Radius.sm, marginBottom: 4 },
   primaryBtn: { paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', marginBottom: 8 },
-  dangerBtn: { paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', marginBottom: 8 },
+  dangerBtn: { paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', marginTop: Spacing.sm, marginBottom: 8 },
   cancelBtn: { paddingVertical: 6, alignItems: 'center' },
 });

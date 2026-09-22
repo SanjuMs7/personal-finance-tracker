@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -144,10 +144,11 @@ export default function SettingsScreen() {
         <AppText weight="bold" style={[styles.sectionLabel, { color: colors.textSecondary }]}>DATA</AppText>
         <Pressable
           onPress={() => setExportOpen(true)}
-          style={({ pressed }) => [
+          android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+          style={[
             styles.card,
             styles.exportRow,
-            { backgroundColor: colors.surface, shadowColor: colors.textPrimary, opacity: pressed ? 0.85 : 1 },
+            { backgroundColor: colors.surface, shadowColor: colors.textPrimary, overflow: 'hidden' },
           ]}
         >
           <View style={[styles.exportIcon, { backgroundColor: colors.primarySoft }]}>
@@ -160,7 +161,10 @@ export default function SettingsScreen() {
         <AppText style={[styles.footer, { color: colors.textSecondary }]}>Personal Finance · v1.0.0</AppText>
       </ScrollView>
 
-      <BottomSheet visible={exportOpen} onClose={closeExport} maxHeight="60%">
+      {/* Wrapped in a Modal so the sheet covers the floating tab bar, which the
+          navigator renders above this screen. Safe here: nothing nests inside it. */}
+      <Modal visible={exportOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={closeExport}>
+        <BottomSheet visible={exportOpen} onClose={closeExport} maxHeight="60%">
         <View style={styles.sheetHeader}>
           <AppText weight="extrabold" style={{ fontSize: 17, color: colors.textPrimary }}>Export Data</AppText>
         </View>
@@ -218,8 +222,9 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
           )}
-        </View>
-      </BottomSheet>
+          </View>
+        </BottomSheet>
+      </Modal>
     </View>
   );
 }

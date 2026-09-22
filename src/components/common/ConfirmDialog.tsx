@@ -30,24 +30,24 @@ export function ConfirmDialog({ visible, title, body, confirmLabel = 'Delete', o
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
-      <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <View style={[styles.card, { backgroundColor: colors.sheetBg }]}>
-          <View style={[styles.iconWrap, { backgroundColor: colors.dangerSoft }]}>
-            <TrashIcon color={colors.danger} size={22} />
-          </View>
-          <AppText weight="extrabold" style={[styles.title, { color: colors.textPrimary }]}>{title}</AppText>
-          <AppText style={[styles.body, { color: colors.textSecondary }]}>{body}</AppText>
-          <View style={styles.row}>
-            <Pressable style={[styles.btn, { backgroundColor: colors.surfaceAlt }]} onPress={onCancel}>
-              <AppText weight="bold" style={[styles.btnText, { color: colors.textPrimary }]}>Cancel</AppText>
-            </Pressable>
-            <Pressable style={[styles.btn, { backgroundColor: colors.danger }]} onPress={onConfirm}>
-              <AppText weight="bold" style={[styles.btnText, { color: '#fff' }]}>{confirmLabel}</AppText>
-            </Pressable>
-          </View>
+    <Modal visible transparent statusBarTranslucent animationType="fade" onRequestClose={onCancel}>
+      <View style={[StyleSheet.absoluteFill, styles.backdrop]}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+      <View style={[styles.card, { backgroundColor: colors.sheetBg }]}>
+        <View style={[styles.iconWrap, { backgroundColor: colors.dangerSoft }]}>
+          <TrashIcon color={colors.danger} size={22} />
         </View>
+        <AppText weight="extrabold" style={[styles.title, { color: colors.textPrimary }]}>{title}</AppText>
+        <AppText style={[styles.body, { color: colors.textSecondary }]}>{body}</AppText>
+        <View style={styles.row}>
+          <Pressable style={[styles.btn, { backgroundColor: colors.surfaceAlt }]} onPress={onCancel}>
+            <AppText weight="bold" style={[styles.btnText, { color: colors.textPrimary }]}>Cancel</AppText>
+          </Pressable>
+          <Pressable style={[styles.btn, { backgroundColor: colors.danger }]} onPress={onConfirm}>
+            <AppText weight="bold" style={[styles.btnText, { color: '#fff' }]}>{confirmLabel}</AppText>
+          </Pressable>
+        </View>
+      </View>
       </View>
     </Modal>
   );

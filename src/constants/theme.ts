@@ -1,3 +1,5 @@
+import type { IconKey } from '@/types';
+
 export const Radius = {
   sm: 12,
   md: 16,
@@ -16,17 +18,26 @@ export const Spacing = {
   xxxl: 32,
 } as const;
 
-/** Category chart / avatar palette, cycled by category order. */
-export const CATEGORY_PALETTE = [
-  '#3A5CFF',
-  '#16C098',
-  '#F5A623',
-  '#FF6B6B',
-  '#8B5CF6',
-  '#22B8CF',
-  '#F472B6',
-  '#64748B',
-];
+/** One fixed colour per icon. Categories must use distinct icons, so this
+ * gives every category a stable colour that never shifts as the list changes. */
+export const ICON_COLORS: Record<IconKey, string> = {
+  food: '#F5A623',
+  groceries: '#16C098',
+  transport: '#3A5CFF',
+  shopping: '#F472B6',
+  home: '#8B5CF6',
+  rent: '#6366F1',
+  bills: '#EF4444',
+  entertainment: '#22B8CF',
+  travel: '#0EA5E9',
+  coffee: '#B45309',
+  health: '#FB7185',
+  fitness: '#10B981',
+  education: '#A855F7',
+  gift: '#D946EF',
+  savings: '#0D9488',
+  other: '#64748B',
+};
 
 export const LightColors = {
   bg: '#F5F6FA',
@@ -40,6 +51,7 @@ export const LightColors = {
   primary: '#3A5CFF',
   primarySoft: '#E9EDFF',
   trackColor: '#EDEFF5',
+  buttonDisabled: '#CFD5E2',
   navBg: 'rgba(255,255,255,0.94)',
   warning: '#F5A623',
   warningSoft: '#FDF1DD',
@@ -62,6 +74,7 @@ export const DarkColors = {
   primary: '#6C87FF',
   primarySoft: '#232A4D',
   trackColor: '#242836',
+  buttonDisabled: '#333A4C',
   navBg: 'rgba(23,26,35,0.9)',
   warning: '#FBBF24',
   warningSoft: '#332A14',

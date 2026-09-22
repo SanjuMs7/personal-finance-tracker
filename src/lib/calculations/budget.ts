@@ -1,5 +1,5 @@
-import { BUDGET_THRESHOLDS, CATEGORY_PALETTE } from '@/constants/theme';
-import type { BudgetStatus, Category, CategoryWithSpend, Expense } from '@/types';
+import { BUDGET_THRESHOLDS, ICON_COLORS } from '@/constants/theme';
+import type { BudgetStatus, Category, CategoryWithSpend, Expense, IconKey } from '@/types';
 
 export function isSameMonth(a: number, b: number): boolean {
   const da = new Date(a);
@@ -29,8 +29,8 @@ export function withSpend(categories: Category[], expenses: Expense[], monthAnch
   });
 }
 
-export function colorForCategoryIndex(index: number): string {
-  return CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
+export function colorForIcon(icon: IconKey): string {
+  return ICON_COLORS[icon] ?? ICON_COLORS.other;
 }
 
 export function totalSpending(expenses: Expense[], monthAnchor: number = Date.now()): number {
