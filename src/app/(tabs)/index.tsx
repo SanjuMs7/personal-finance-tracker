@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Path } from 'react-native-svg';
 
@@ -8,11 +8,12 @@ import { AppText } from '@/components/common/AppText';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Icon } from '@/components/common/Icon';
 import { MonthSwitcher } from '@/components/common/MonthSwitcher';
+import { CategoryBarChart, type BarDatum } from '@/components/charts/CategoryBarChart';
 import { SemiDonutChart, type ChartSegment } from '@/components/charts/SemiDonutChart';
 import { Radius, Spacing } from '@/constants/theme';
 import { useMonthNavigation } from '@/hooks/use-month-navigation';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForIcon, isSameMonth, totalSpending } from '@/lib/calculations/budget';
+import { colorForIcon, isSameMonth, limitForMonth, totalSpending } from '@/lib/calculations/budget';
 import { formatDateGroupLabel, formatFriendlyTime } from '@/lib/formatting/datetime';
 import { formatMoney } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
@@ -41,20 +42,58 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const categories = useAppStore((s) => s.categories);
   const expenses = useAppStore((s) => s.expenses);
+  const limits = useAppStore((s) => s.limits);
 
   const nav = useMonthNavigation();
   const monthAnchor = nav.monthAnchor;
+  const { width } = useWindowDimensions();
+  const [showBars, setShowBars] = useState(false);
   const monthExpenses = useMemo(() => expenses.filter((e) => isSameMonth(e.expenseDate, monthAnchor)), [expenses, monthAnchor]);
   const total = useMemo(() => totalSpending(expenses, monthAnchor), [expenses, monthAnchor]);
 
+  // Arcs follow the Limits grid's order, matching the bar view, so a colour keeps
+  // its position in the sweep instead of jumping as the amounts change.
   const chartSegments: ChartSegment[] = useMemo(() => {
     const byCategory = new Map<string, number>();
     monthExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
-    return categories
+    return [...categories]
+      .sort(
+        (a, b) =>
+          Number(limitForMonth(limits, b.id, monthAnchor) != null) -
+          Number(limitForMonth(limits, a.id, monthAnchor) != null)
+      )
       .map((c) => ({ key: c.id, value: byCategory.get(c.id) ?? 0, color: colorForIcon(c.icon) }))
-      .filter((s) => s.value > 0)
-      .sort((a, b) => b.value - a.value);
-  }, [categories, monthExpenses]);
+      .filter((s) => s.value > 0);
+  }, [categories, monthExpenses, limits, monthAnchor]);
+
+  // A past month is over, so it counts in full; the current one only counts the
+  // days that have actually happened.
+  const daysElapsed = useMemo(() => {
+    const viewed = new Date(monthAnchor);
+    const today = new Date(nav.dayAnchor);
+    const isCurrent = viewed.getFullYear() === today.getFullYear() && viewed.getMonth() === today.getMonth();
+    return isCurrent ? today.getDate() : new Date(viewed.getFullYear(), viewed.getMonth() + 1, 0).getDate();
+  }, [monthAnchor, nav.dayAnchor]);
+
+  // Bars follow the Limits grid's order — limited categories first, newest first
+  // within each group — so a category keeps its slot as you step through months.
+  const dailyAverages: BarDatum[] = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    monthExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
+    return [...categories]
+      .sort(
+        (a, b) =>
+          Number(limitForMonth(limits, b.id, monthAnchor) != null) -
+          Number(limitForMonth(limits, a.id, monthAnchor) != null)
+      )
+      .map((c) => ({
+        key: c.id,
+        label: c.name,
+        icon: c.icon,
+        color: colorForIcon(c.icon),
+        value: Math.round((byCategory.get(c.id) ?? 0) / daysElapsed),
+      }));
+  }, [categories, monthExpenses, daysElapsed, limits, monthAnchor]);
 
   // Grouped by day, newest first, so nothing is hidden just for not being today.
   const sections = useMemo(() => {
@@ -99,23 +138,40 @@ export default function HomeScreen() {
       >
         <View style={styles.headerRow}>
           <AppText weight="extrabold" style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Personal Finance
+            Spending
           </AppText>
           <MonthSwitcher nav={nav} />
         </View>
 
         {hasAnyExpenses ? (
           <>
-            <View style={[styles.chartCard, { backgroundColor: colors.surface, shadowColor: colors.textPrimary }]}>
-              <SemiDonutChart
-                segments={chartSegments}
-                total={total}
-                trackColor={colors.trackColor}
-                textColor={colors.textPrimary}
-                secondaryTextColor={colors.textSecondary}
-                width={240}
-              />
-            </View>
+            <Pressable
+              onPress={() => setShowBars((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={showBars ? 'Show spending breakdown' : 'Show daily average per category'}
+              style={[styles.chartCard, { backgroundColor: colors.surface, shadowColor: colors.textPrimary }]}
+            >
+              {showBars ? (
+                <CategoryBarChart
+                  data={dailyAverages}
+                  total={Math.round(total / daysElapsed)}
+                  caption={`Average per day · ${daysElapsed} ${daysElapsed === 1 ? 'day' : 'days'}`}
+                  width={width - Spacing.xl * 2 - 40}
+                  trackColor={colors.trackColor}
+                  textColor={colors.textPrimary}
+                  secondaryTextColor={colors.textSecondary}
+                />
+              ) : (
+                <SemiDonutChart
+                  segments={chartSegments}
+                  total={total}
+                  trackColor={colors.trackColor}
+                  textColor={colors.textPrimary}
+                  secondaryTextColor={colors.textSecondary}
+                  width={240}
+                />
+              )}
+            </Pressable>
 
             <View style={styles.sectionRow}>
               <AppText weight="bold" style={[styles.sectionTitle, { color: colors.textPrimary }]}>
@@ -177,9 +233,9 @@ export default function HomeScreen() {
         ) : (
           <EmptyState
             icon={<CompassGlyph color={colors.primary} />}
-            title="No expenses yet"
-            message="Start tracking your spending by adding your first expense."
-            actionLabel="+ Add Expense"
+            title="Nothing tracked yet"
+            message="Your spending chart appears as soon as you add something."
+            actionLabel="+ Add your first expense"
             onAction={() => router.push({ pathname: '/expense/[id]', params: { id: 'new' } })}
           />
         )}

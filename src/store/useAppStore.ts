@@ -142,7 +142,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   setThemePreference: async (theme) => {
     const { database } = get();
     if (!database) throw new Error('Database not ready');
-    await db.setTheme(database, theme);
+    // Repaint first, persist after. Awaiting the SQLite round trip before
+    // touching state is what made switching appearance feel sluggish.
     set({ themePreference: theme });
+    try {
+      await db.setTheme(database, theme);
+    } catch (err) {
+      console.warn('Failed to persist theme', err);
+    }
   },
 }));

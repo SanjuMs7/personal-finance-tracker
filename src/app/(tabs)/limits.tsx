@@ -123,8 +123,9 @@ export default function LimitsScreen() {
             {ordered.map((category) => {
               const color = colorForIcon(category.icon);
               const hasLimit = category.monthlyLimit != null && category.monthlyLimit > 0;
+              // Green while comfortably under, amber from 80%, red at the limit.
               const ringColor =
-                category.status === 'danger' ? colors.danger : category.status === 'warning' ? colors.warning : color;
+                category.status === 'danger' ? colors.danger : category.status === 'warning' ? colors.warning : colors.success;
 
               return (
                 <Pressable
@@ -138,7 +139,12 @@ export default function LimitsScreen() {
                   }
                   style={({ pressed }) => [styles.tile, { width: tileWidth, opacity: pressed ? 0.7 : 1 }]}
                 >
-                  <View style={[styles.tileSquare, { width: tileWidth, height: tileWidth, backgroundColor: color + '22' }]}>
+                  <View
+                    style={[
+                      styles.tileSquare,
+                      { width: tileWidth, height: tileWidth, backgroundColor: colors.surface, shadowColor: colors.textPrimary },
+                    ]}
+                  >
                     <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center' }}>
                       {hasLimit ? (
                         <ProgressRing
@@ -218,7 +224,16 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 12.5, marginBottom: Spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: GRID_GAP, rowGap: Spacing.xl },
   tile: { alignItems: 'center' },
-  tileSquare: { borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  tileSquare: {
+    borderRadius: Radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
   tileAmount: { fontSize: 10.5, textAlign: 'center', marginTop: 7 },
   addTile: {
     borderRadius: Radius.lg,

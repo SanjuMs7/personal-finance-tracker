@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "Personal Finance",
+    "name": "Pocket",
     "slug": "personal-finance-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "personalfinance",
+    "scheme": "pocket",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.personalfinancetracker"
+      "package": "com.sanjums.pocket"
     },
     "web": {
       "output": "static",
@@ -29,9 +29,14 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#3A5CFF",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 86,
+          "dark": {
+            "backgroundColor": "#0D0F16",
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 86
+          }
         }
       ],
       "expo-sqlite",
