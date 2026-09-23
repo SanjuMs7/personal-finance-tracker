@@ -40,3 +40,9 @@ export function formatDateGroupLabel(timestamp: number, now: number): string {
 
   return `${d.getDate().toString().padStart(2, '0')} · ${d.toLocaleDateString('en-IN', { month: 'short' })}`;
 }
+
+/** 'Sep 2026' — compact enough to sit in a screen header. */
+export function formatMonthYearLabel(timestamp: number): string {
+  const d = new Date(timestamp);
+  return `${d.toLocaleDateString('en-IN', { month: 'short' })} ${d.getFullYear()}`;
+}

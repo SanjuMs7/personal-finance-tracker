@@ -3,15 +3,15 @@ import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 
 import { withSpend } from '@/lib/calculations/budget';
-import type { Category, Expense } from '@/types';
+import type { Category, CategoryLimit, Expense } from '@/types';
 
 function toRupees(paise: number): number {
   return Math.round((paise / 100) * 100) / 100;
 }
 
-export async function exportExcel(categories: Category[], expenses: Expense[]): Promise<string> {
+export async function exportExcel(categories: Category[], expenses: Expense[], limits: CategoryLimit[]): Promise<string> {
   const monthAnchor = Date.now();
-  const catRows = withSpend(categories, expenses, monthAnchor);
+  const catRows = withSpend(categories, expenses, limits, monthAnchor);
 
   const expenseRows = expenses
     .slice()

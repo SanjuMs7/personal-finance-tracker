@@ -33,14 +33,15 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number) {
 }
 
 export function SemiDonutChart({ segments, total, trackColor, textColor, secondaryTextColor, width = 240 }: SemiDonutChartProps) {
-  const height = width * (130 / 240);
+  // Tall enough that the thicker stroke clears the top edge of the viewBox.
+  const height = width * (140 / 240);
   const cx = width / 2;
   const cy = height - 10;
   const r = width * 0.425;
-  const strokeWidth = width * 0.083;
+  const strokeWidth = width * 0.096;
 
   const filtered = segments.filter((s) => s.value > 0);
-  const gap = filtered.length > 1 ? 3 : 0;
+  const gap = filtered.length > 1 ? 2.5 : 0;
   const spans = filtered.map((seg) => (total > 0 ? (seg.value / total) * 180 : 0));
 
   const arcs = filtered.map((seg, index) => {
@@ -54,9 +55,9 @@ export function SemiDonutChart({ segments, total, trackColor, textColor, seconda
   return (
     <View style={{ width, height, alignItems: 'center' }}>
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-        <Path d={arcPath(cx, cy, r, 180, 360)} stroke={trackColor} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" />
+        <Path d={arcPath(cx, cy, r, 180, 360)} stroke={trackColor} strokeWidth={strokeWidth} fill="none" strokeLinecap="butt" />
         {arcs.map((arc) => (
-          <Path key={arc.key} d={arc.d} stroke={arc.color} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" />
+          <Path key={arc.key} d={arc.d} stroke={arc.color} strokeWidth={strokeWidth} fill="none" strokeLinecap="butt" />
         ))}
       </Svg>
       <Animated.View entering={FadeIn.duration(400)} style={styles.centerLabel}>

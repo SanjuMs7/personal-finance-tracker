@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import type { Category, Expense, IconKey, ThemePreference } from '@/types';
+import type { Category, CategoryLimit, Expense, IconKey, ThemePreference } from '@/types';
 
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -10,9 +10,14 @@ interface CategoryRow {
   id: string;
   name: string;
   icon: string;
-  monthly_limit: number | null;
   created_at: number;
   updated_at: number;
+}
+
+interface CategoryLimitRow {
+  category_id: string;
+  effective_month: number;
+  amount: number | null;
 }
 
 interface ExpenseRow {
@@ -31,7 +36,6 @@ function rowToCategory(row: CategoryRow): Category {
     id: row.id,
     name: row.name,
     icon: row.icon as IconKey,
-    monthlyLimit: row.monthly_limit,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -62,40 +66,56 @@ export async function getAllExpenses(db: SQLiteDatabase): Promise<Expense[]> {
 
 export async function createCategory(
   db: SQLiteDatabase,
-  input: { name: string; icon: IconKey; monthlyLimit: number | null }
+  input: { name: string; icon: IconKey }
 ): Promise<Category> {
   const id = generateId();
   const now = Date.now();
   await db.runAsync(
-    'INSERT INTO categories (id, name, icon, monthly_limit, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO categories (id, name, icon, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
     id,
     input.name,
     input.icon,
-    input.monthlyLimit,
     now,
     now
   );
-  return { id, name: input.name, icon: input.icon, monthlyLimit: input.monthlyLimit, createdAt: now, updatedAt: now };
+  return { id, name: input.name, icon: input.icon, createdAt: now, updatedAt: now };
 }
 
 export async function updateCategory(
   db: SQLiteDatabase,
   id: string,
-  input: { name: string; icon: IconKey; monthlyLimit: number | null }
+  input: { name: string; icon: IconKey }
 ): Promise<void> {
   const now = Date.now();
-  await db.runAsync(
-    'UPDATE categories SET name = ?, icon = ?, monthly_limit = ?, updated_at = ? WHERE id = ?',
-    input.name,
-    input.icon,
-    input.monthlyLimit,
-    now,
-    id
-  );
+  await db.runAsync('UPDATE categories SET name = ?, icon = ?, updated_at = ? WHERE id = ?', input.name, input.icon, now, id);
 }
 
 export async function deleteCategory(db: SQLiteDatabase, id: string): Promise<void> {
+  // Explicit rather than relying on the foreign key: ON DELETE CASCADE only fires
+  // when PRAGMA foreign_keys is on, which is off by default in SQLite.
+  await db.runAsync('DELETE FROM category_limits WHERE category_id = ?', id);
   await db.runAsync('DELETE FROM categories WHERE id = ?', id);
+}
+
+export async function getAllLimits(db: SQLiteDatabase): Promise<CategoryLimit[]> {
+  const rows = await db.getAllAsync<CategoryLimitRow>('SELECT * FROM category_limits ORDER BY effective_month ASC');
+  return rows.map((r) => ({ categoryId: r.category_id, effectiveMonth: r.effective_month, amount: r.amount }));
+}
+
+/** Records the limit that applies from `effectiveMonth` onward; null means no limit. */
+export async function setCategoryLimit(
+  db: SQLiteDatabase,
+  categoryId: string,
+  effectiveMonth: number,
+  amount: number | null
+): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO category_limits (category_id, effective_month, amount) VALUES (?, ?, ?)
+     ON CONFLICT(category_id, effective_month) DO UPDATE SET amount = excluded.amount`,
+    categoryId,
+    effectiveMonth,
+    amount
+  );
 }
 
 export async function reassignExpenses(db: SQLiteDatabase, fromCategoryId: string, toCategoryId: string): Promise<void> {

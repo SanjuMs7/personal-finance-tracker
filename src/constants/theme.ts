@@ -36,6 +36,7 @@ export const ICON_COLORS: Record<IconKey, string> = {
   education: '#A855F7',
   gift: '#D946EF',
   savings: '#0D9488',
+  recharge: '#84CC16',
   other: '#64748B',
 };
 

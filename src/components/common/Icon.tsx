@@ -145,6 +145,15 @@ export function Icon({ name, size = 20, color }: IconProps) {
           />
         </Svg>
       );
+    case 'recharge':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect x={4} y={3} width={9.5} height={18} rx={2.2} {...common} />
+          <Line x1={7} y1={18} x2={10.5} y2={18} {...common} />
+          <Path d="M16.5 8.5a4.5 4.5 0 0 1 0 7" {...common} />
+          <Path d="M19.3 6a8 8 0 0 1 0 12" {...common} />
+        </Svg>
+      );
     case 'other':
     default:
       return (
@@ -172,6 +181,7 @@ export const ICON_KEYS: IconKey[] = [
   'education',
   'gift',
   'savings',
+  'recharge',
   'other',
 ];
 
@@ -191,5 +201,6 @@ export const ICON_LABELS: Record<IconKey, string> = {
   education: 'Education',
   gift: 'Gift',
   savings: 'Savings',
-  other: 'Other',
+  recharge: 'Recharge',
+  other: 'Miscellaneous',
 };

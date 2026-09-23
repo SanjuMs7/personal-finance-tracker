@@ -71,6 +71,7 @@ export default function SettingsScreen() {
   const setThemePreference = useAppStore((s) => s.setThemePreference);
   const categories = useAppStore((s) => s.categories);
   const expenses = useAppStore((s) => s.expenses);
+  const limits = useAppStore((s) => s.limits);
 
   const [exportOpen, setExportOpen] = useState(false);
   const [stage, setStage] = useState<ExportStage>('idle');
@@ -81,9 +82,9 @@ export default function SettingsScreen() {
     setStage('busy');
     try {
       if (kind === 'excel') {
-        await exportExcel(categories, expenses);
+        await exportExcel(categories, expenses, limits);
       } else {
-        await exportPdf(categories, expenses);
+        await exportPdf(categories, expenses, limits);
       }
       setStage('done');
     } catch (err) {

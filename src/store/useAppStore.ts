@@ -2,19 +2,27 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { create } from 'zustand';
 
 import * as db from '@/database/queries';
-import type { Category, Expense, IconKey, ThemePreference } from '@/types';
+import { monthIndexOf } from '@/lib/calculations/budget';
+import type { Category, CategoryLimit, Expense, IconKey, ThemePreference } from '@/types';
 
 interface AppState {
   database: SQLiteDatabase | null;
   hydrated: boolean;
   categories: Category[];
   expenses: Expense[];
+  limits: CategoryLimit[];
   themePreference: ThemePreference;
+  /** Months back from the current one that the Home and Limits screens are showing.
+   *  0 is this month; it is relative, so it never goes stale across a rollover. */
+  monthOffset: number;
 
   hydrate: (database: SQLiteDatabase) => Promise<void>;
+  setMonthOffset: (offset: number) => void;
 
-  addCategory: (input: { name: string; icon: IconKey; monthlyLimit: number | null }) => Promise<Category>;
-  updateCategory: (id: string, input: { name: string; icon: IconKey; monthlyLimit: number | null }) => Promise<void>;
+  addCategory: (input: { name: string; icon: IconKey }) => Promise<Category>;
+  updateCategory: (id: string, input: { name: string; icon: IconKey }) => Promise<void>;
+  /** Sets the limit that applies from the month containing `monthAnchor` onward. */
+  setCategoryLimit: (categoryId: string, monthAnchor: number, amount: number | null) => Promise<void>;
   deleteCategorySimple: (id: string) => Promise<void>;
   deleteCategoryAndReassign: (id: string, targetCategoryId: string) => Promise<void>;
   deleteCategoryAndExpenses: (id: string) => Promise<void>;
@@ -34,15 +42,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   hydrated: false,
   categories: [],
   expenses: [],
+  limits: [],
   themePreference: 'system',
+  monthOffset: 0,
+
+  setMonthOffset: (offset) => set({ monthOffset: offset }),
 
   hydrate: async (database) => {
-    const [categories, expenses, themePreference] = await Promise.all([
+    const [categories, expenses, limits, themePreference] = await Promise.all([
       db.getAllCategories(database),
       db.getAllExpenses(database),
+      db.getAllLimits(database),
       db.getTheme(database),
     ]);
-    set({ database, categories, expenses, themePreference, hydrated: true });
+    set({ database, categories, expenses, limits, themePreference, hydrated: true });
   },
 
   addCategory: async (input) => {
@@ -62,31 +75,42 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  setCategoryLimit: async (categoryId, monthAnchor, amount) => {
+    const { database, limits } = get();
+    if (!database) throw new Error('Database not ready');
+    const effectiveMonth = monthIndexOf(monthAnchor);
+    await db.setCategoryLimit(database, categoryId, effectiveMonth, amount);
+    const others = limits.filter((l) => !(l.categoryId === categoryId && l.effectiveMonth === effectiveMonth));
+    set({ limits: [...others, { categoryId, effectiveMonth, amount }] });
+  },
+
   deleteCategorySimple: async (id) => {
-    const { database, categories } = get();
+    const { database, categories, limits } = get();
     if (!database) throw new Error('Database not ready');
     await db.deleteCategory(database, id);
-    set({ categories: categories.filter((c) => c.id !== id) });
+    set({ categories: categories.filter((c) => c.id !== id), limits: limits.filter((l) => l.categoryId !== id) });
   },
 
   deleteCategoryAndReassign: async (id, targetCategoryId) => {
-    const { database, categories, expenses } = get();
+    const { database, categories, expenses, limits } = get();
     if (!database) throw new Error('Database not ready');
     await db.reassignExpenses(database, id, targetCategoryId);
     await db.deleteCategory(database, id);
     set({
       categories: categories.filter((c) => c.id !== id),
+      limits: limits.filter((l) => l.categoryId !== id),
       expenses: expenses.map((e) => (e.categoryId === id ? { ...e, categoryId: targetCategoryId } : e)),
     });
   },
 
   deleteCategoryAndExpenses: async (id) => {
-    const { database, categories, expenses } = get();
+    const { database, categories, expenses, limits } = get();
     if (!database) throw new Error('Database not ready');
     await db.deleteExpensesByCategory(database, id);
     await db.deleteCategory(database, id);
     set({
       categories: categories.filter((c) => c.id !== id),
+      limits: limits.filter((l) => l.categoryId !== id),
       expenses: expenses.filter((e) => e.categoryId !== id),
     });
   },

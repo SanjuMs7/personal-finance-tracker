@@ -1,29 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Line, Path } from 'react-native-svg';
 
 import { AppText } from '@/components/common/AppText';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Icon } from '@/components/common/Icon';
+import { MonthSwitcher } from '@/components/common/MonthSwitcher';
 import { SemiDonutChart, type ChartSegment } from '@/components/charts/SemiDonutChart';
 import { Radius, Spacing } from '@/constants/theme';
+import { useMonthNavigation } from '@/hooks/use-month-navigation';
 import { useTheme } from '@/hooks/use-theme';
 import { colorForIcon, isSameMonth, totalSpending } from '@/lib/calculations/budget';
 import { formatDateGroupLabel, formatFriendlyTime } from '@/lib/formatting/datetime';
 import { formatMoney } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
-
-function MoreGlyph({ color }: { color: string }) {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill={color}>
-      <Circle cx={5} cy={12} r={2} />
-      <Circle cx={12} cy={12} r={2} />
-      <Circle cx={19} cy={12} r={2} />
-    </Svg>
-  );
-}
 
 function PlusGlyph({ color }: { color: string }) {
   return (
@@ -50,7 +42,8 @@ export default function HomeScreen() {
   const categories = useAppStore((s) => s.categories);
   const expenses = useAppStore((s) => s.expenses);
 
-  const [monthAnchor] = useState(() => Date.now());
+  const nav = useMonthNavigation();
+  const monthAnchor = nav.monthAnchor;
   const monthExpenses = useMemo(() => expenses.filter((e) => isSameMonth(e.expenseDate, monthAnchor)), [expenses, monthAnchor]);
   const total = useMemo(() => totalSpending(expenses, monthAnchor), [expenses, monthAnchor]);
 
@@ -65,7 +58,7 @@ export default function HomeScreen() {
 
   // Grouped by day, newest first, so nothing is hidden just for not being today.
   const sections = useMemo(() => {
-    const rows = [...expenses]
+    const rows = [...monthExpenses]
       .sort((a, b) => b.expenseDate - a.expenseDate)
       .map((e) => {
         const category = categories.find((c) => c.id === e.categoryId);
@@ -90,11 +83,11 @@ export default function HomeScreen() {
       if (last && last.key === key) {
         last.rows.push(row);
       } else {
-        groups.push({ key, label: formatDateGroupLabel(row.expenseDate, monthAnchor), rows: [row] });
+        groups.push({ key, label: formatDateGroupLabel(row.expenseDate, nav.dayAnchor), rows: [row] });
       }
     });
     return groups;
-  }, [expenses, categories, colors.textSecondary, monthAnchor]);
+  }, [monthExpenses, categories, colors.textSecondary, nav.dayAnchor]);
 
   const hasAnyExpenses = expenses.length > 0;
 
@@ -108,9 +101,7 @@ export default function HomeScreen() {
           <AppText weight="extrabold" style={[styles.headerTitle, { color: colors.textPrimary }]}>
             Personal Finance
           </AppText>
-          <View style={[styles.moreBtn, { backgroundColor: colors.surfaceAlt }]}>
-            <MoreGlyph color={colors.textSecondary} />
-          </View>
+          <MonthSwitcher nav={nav} />
         </View>
 
         {hasAnyExpenses ? (
@@ -140,6 +131,12 @@ export default function HomeScreen() {
                 <PlusGlyph color="#fff" />
               </Pressable>
             </View>
+
+            {sections.length === 0 ? (
+              <View style={[styles.emptyMonthCard, { backgroundColor: colors.surface, shadowColor: colors.textPrimary }]}>
+                <AppText style={{ fontSize: 13.5, color: colors.textSecondary }}>No expenses this month.</AppText>
+              </View>
+            ) : null}
 
             {sections.map((section) => (
               <View key={section.key} style={styles.section}>
@@ -196,7 +193,6 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: Spacing.xl },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.xl },
   headerTitle: { fontSize: 22, letterSpacing: -0.3 },
-  moreBtn: { width: 36, height: 36, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   chartCard: {
     borderRadius: Radius.lg,
     paddingVertical: 28,
@@ -226,7 +222,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   expenseIcon: { width: 40, height: 40, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
-  noTodayCard: {
+  emptyMonthCard: {
     borderRadius: Radius.lg,
     paddingVertical: 28,
     alignItems: 'center',

@@ -14,6 +14,7 @@ export type IconKey =
   | 'fitness'
   | 'gift'
   | 'savings'
+  | 'recharge'
   | 'other';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -22,10 +23,21 @@ export interface Category {
   id: string;
   name: string;
   icon: IconKey;
-  /** Monthly limit in paise, or null when the category has no limit. */
-  monthlyLimit: number | null;
   createdAt: number;
   updatedAt: number;
+}
+
+/**
+ * A limit that takes effect in `effectiveMonth` and holds until a later row
+ * replaces it. Storing changes this way keeps a past month showing the limit
+ * that was actually in force at the time.
+ */
+export interface CategoryLimit {
+  categoryId: string;
+  /** Month index: year * 12 + zero-based month. */
+  effectiveMonth: number;
+  /** Limit in paise, or null when the limit was removed from that month on. */
+  amount: number | null;
 }
 
 export interface Expense {
@@ -44,6 +56,8 @@ export interface Expense {
 export type BudgetStatus = 'none' | 'normal' | 'warning' | 'danger';
 
 export interface CategoryWithSpend extends Category {
+  /** The limit in force for the month being viewed, in paise; null when none. */
+  monthlyLimit: number | null;
   spent: number;
   percent: number;
   status: BudgetStatus;

@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 
 import { colorForIcon, withSpend } from '@/lib/calculations/budget';
 import { formatMoney } from '@/lib/formatting/money';
-import type { Category, Expense } from '@/types';
+import type { Category, CategoryLimit, Expense } from '@/types';
 
 function esc(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -15,9 +15,9 @@ function statusColor(status: string): string {
   return '#3A5CFF';
 }
 
-function buildReportHtml(categories: Category[], expenses: Expense[]): string {
+function buildReportHtml(categories: Category[], expenses: Expense[], limits: CategoryLimit[]): string {
   const monthAnchor = Date.now();
-  const rows = withSpend(categories, expenses, monthAnchor);
+  const rows = withSpend(categories, expenses, limits, monthAnchor);
   const totalSpent = rows.reduce((s, c) => s + c.spent, 0);
   const totalBudget = rows.reduce((s, c) => s + (c.monthlyLimit ?? 0), 0);
   const remaining = totalBudget - totalSpent;
@@ -127,8 +127,8 @@ function buildReportHtml(categories: Category[], expenses: Expense[]): string {
   </html>`;
 }
 
-export async function exportPdf(categories: Category[], expenses: Expense[]): Promise<string> {
-  const html = buildReportHtml(categories, expenses);
+export async function exportPdf(categories: Category[], expenses: Expense[], limits: CategoryLimit[]): Promise<string> {
+  const html = buildReportHtml(categories, expenses, limits);
   const { uri } = await Print.printToFileAsync({ html, base64: false });
 
   if (await Sharing.isAvailableAsync()) {

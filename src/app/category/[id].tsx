@@ -10,8 +10,10 @@ import { ICON_KEYS, ICON_LABELS, Icon } from '@/components/common/Icon';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { MoveCategoryDialog } from '@/components/limits/MoveCategoryDialog';
 import { Radius, Spacing } from '@/constants/theme';
+import { useMonthNavigation } from '@/hooks/use-month-navigation';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForIcon } from '@/lib/calculations/budget';
+import { colorForIcon, limitForMonth } from '@/lib/calculations/budget';
+import { formatMonthYearLabel } from '@/lib/formatting/datetime';
 import { formatMoneyInput } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
 import type { IconKey } from '@/types';
@@ -35,12 +37,17 @@ export default function CategoryFormScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const categories = useAppStore((s) => s.categories);
   const expenses = useAppStore((s) => s.expenses);
+  const limits = useAppStore((s) => s.limits);
   const addCategory = useAppStore((s) => s.addCategory);
   const updateCategory = useAppStore((s) => s.updateCategory);
+  const setCategoryLimit = useAppStore((s) => s.setCategoryLimit);
   const deleteCategorySimple = useAppStore((s) => s.deleteCategorySimple);
   const deleteCategoryAndReassign = useAppStore((s) => s.deleteCategoryAndReassign);
   const deleteCategoryAndExpenses = useAppStore((s) => s.deleteCategoryAndExpenses);
 
+  // Limits are edited for the month you are looking at, so what you see on the
+  // Limits screen is what this sheet changes.
+  const { monthAnchor } = useMonthNavigation();
   const isNew = id === 'new';
   const existing = useMemo(() => (isNew ? undefined : categories.find((c) => c.id === id)), [categories, id, isNew]);
   const expenseCount = useMemo(() => expenses.filter((e) => e.categoryId === id).length, [expenses, id]);
@@ -56,7 +63,11 @@ export default function CategoryFormScreen() {
   const [icon, setIcon] = useState<IconKey>(
     existing?.icon ?? ICON_KEYS.find((k) => !categories.some((c) => c.icon === k)) ?? 'other'
   );
-  const [limitText, setLimitText] = useState(existing?.monthlyLimit != null ? formatMoneyInput(existing.monthlyLimit) : '');
+  const limitInForce = useMemo(
+    () => (existing ? limitForMonth(limits, existing.id, monthAnchor) : null),
+    [existing, limits, monthAnchor]
+  );
+  const [limitText, setLimitText] = useState(limitInForce != null ? formatMoneyInput(limitInForce) : '');
 
   const [iconListOpen, setIconListOpen] = useState(false);
   const [simpleDeleteOpen, setSimpleDeleteOpen] = useState(false);
@@ -91,10 +102,15 @@ export default function CategoryFormScreen() {
     if (!isValid) return;
     const parsed = limitText.trim() === '' ? null : Math.max(0, Math.round(parseFloat(limitText) * 100));
     const monthlyLimit = parsed === null || Number.isNaN(parsed) ? null : parsed;
+
     if (isNew) {
-      await addCategory({ name: name.trim(), icon, monthlyLimit });
+      const created = await addCategory({ name: name.trim(), icon });
+      if (monthlyLimit != null) await setCategoryLimit(created.id, monthAnchor, monthlyLimit);
     } else if (existing) {
-      await updateCategory(existing.id, { name: name.trim(), icon, monthlyLimit });
+      await updateCategory(existing.id, { name: name.trim(), icon });
+      // Only record a change: an unchanged limit would add a redundant row that
+      // pins this month's value and blocks earlier edits from carrying forward.
+      if (monthlyLimit !== limitInForce) await setCategoryLimit(existing.id, monthAnchor, monthlyLimit);
     }
     close();
   }
@@ -252,6 +268,9 @@ export default function CategoryFormScreen() {
                 style={[styles.limitInput, { color: colors.textPrimary }]}
               />
             </View>
+            <AppText style={{ fontSize: 11.5, color: colors.textSecondary, marginTop: 6 }}>
+              Applies from {formatMonthYearLabel(monthAnchor)} onward. Earlier months keep their own limit.
+            </AppText>
           </View>
 
         </View>
