@@ -43,10 +43,18 @@ export function MoveCategoryDialog({
             This category has {expenseCount} expense{expenseCount === 1 ? '' : 's'}. Move them to another category, or delete them too.
           </AppText>
 
-          <AppText weight="bold" style={{ fontSize: 11.5, color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 8 }}>
-            MOVE EXPENSES TO
-          </AppText>
-          <ScrollView style={styles.list}>
+          {otherCategories.length === 0 ? (
+            <AppText style={{ fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, marginBottom: Spacing.lg }}>
+              This is your only category, so there is nowhere to move them to.
+            </AppText>
+          ) : null}
+
+          {otherCategories.length > 0 ? (
+            <AppText weight="bold" style={{ fontSize: 11.5, color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 8 }}>
+              MOVE EXPENSES TO
+            </AppText>
+          ) : null}
+          <ScrollView style={otherCategories.length > 0 ? styles.list : undefined}>
             {otherCategories.map((c) => {
               const active = c.id === selectedTargetId;
               return (
@@ -62,13 +70,15 @@ export function MoveCategoryDialog({
             })}
           </ScrollView>
 
-          <Pressable
-            onPress={onMoveAndDelete}
-            disabled={!selectedTargetId}
-            style={[styles.primaryBtn, { backgroundColor: colors.primary, opacity: selectedTargetId ? 1 : 0.45 }]}
-          >
-            <AppText weight="bold" style={{ color: '#fff', fontSize: 13.5 }}>Move &amp; Delete Category</AppText>
-          </Pressable>
+          {otherCategories.length > 0 ? (
+            <Pressable
+              onPress={onMoveAndDelete}
+              disabled={!selectedTargetId}
+              style={[styles.primaryBtn, { backgroundColor: colors.primary, opacity: selectedTargetId ? 1 : 0.45 }]}
+            >
+              <AppText weight="bold" style={{ color: '#fff', fontSize: 13.5 }}>Move &amp; Delete Category</AppText>
+            </Pressable>
+          ) : null}
           <Pressable onPress={onDeleteAll} style={[styles.dangerBtn, { backgroundColor: colors.dangerSoft }]}>
             <AppText weight="bold" style={{ color: colors.danger, fontSize: 13.5 }}>Delete Category &amp; Its Expenses</AppText>
           </Pressable>

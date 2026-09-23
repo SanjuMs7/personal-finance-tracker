@@ -6,9 +6,11 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { AppText } from '@/components/common/AppText';
 import { BottomSheet } from '@/components/common/BottomSheet';
 import { Radius, Spacing } from '@/constants/theme';
+import { useMonthNavigation } from '@/hooks/use-month-navigation';
 import { useTheme } from '@/hooks/use-theme';
 import { exportExcel } from '@/lib/export/excel';
 import { exportPdf } from '@/lib/export/pdf';
+import { formatMonthYearLabel } from '@/lib/formatting/datetime';
 import { useAppStore } from '@/store/useAppStore';
 import type { ThemePreference } from '@/types';
 
@@ -72,6 +74,7 @@ export default function SettingsScreen() {
   const categories = useAppStore((s) => s.categories);
   const expenses = useAppStore((s) => s.expenses);
   const limits = useAppStore((s) => s.limits);
+  const { monthAnchor } = useMonthNavigation();
 
   const [exportOpen, setExportOpen] = useState(false);
   const [stage, setStage] = useState<ExportStage>('idle');
@@ -82,9 +85,9 @@ export default function SettingsScreen() {
     setStage('busy');
     try {
       if (kind === 'excel') {
-        await exportExcel(categories, expenses, limits);
+        await exportExcel(categories, expenses, limits, monthAnchor);
       } else {
-        await exportPdf(categories, expenses, limits);
+        await exportPdf(categories, expenses, limits, monthAnchor);
       }
       setStage('done');
     } catch (err) {
@@ -168,6 +171,9 @@ export default function SettingsScreen() {
         <BottomSheet visible={exportOpen} onClose={closeExport} maxHeight="60%">
         <View style={styles.sheetHeader}>
           <AppText weight="extrabold" style={{ fontSize: 17, color: colors.textPrimary }}>Export Data</AppText>
+          <AppText style={{ fontSize: 12.5, color: colors.textSecondary, marginTop: 3 }}>
+            {formatMonthYearLabel(monthAnchor)}
+          </AppText>
         </View>
         <View style={styles.sheetBody}>
           {stage === 'idle' && (

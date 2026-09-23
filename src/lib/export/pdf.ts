@@ -1,7 +1,8 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { colorForIcon, withSpend } from '@/lib/calculations/budget';
+import { colorForIcon, isSameMonth, withSpend } from '@/lib/calculations/budget';
+import { formatMonthYearLabel } from '@/lib/formatting/datetime';
 import { formatMoney } from '@/lib/formatting/money';
 import type { Category, CategoryLimit, Expense } from '@/types';
 
@@ -10,13 +11,18 @@ function esc(value: string): string {
 }
 
 function statusColor(status: string): string {
-  if (status === 'danger') return '#EF4444';
+  if (status === 'danger') return '#DC2626';
   if (status === 'warning') return '#F5A623';
   return '#3A5CFF';
 }
 
-function buildReportHtml(categories: Category[], expenses: Expense[], limits: CategoryLimit[]): string {
-  const monthAnchor = Date.now();
+function buildReportHtml(
+  categories: Category[],
+  expenses: Expense[],
+  limits: CategoryLimit[],
+  monthAnchor: number
+): string {
+  const monthLabel = formatMonthYearLabel(monthAnchor);
   const rows = withSpend(categories, expenses, limits, monthAnchor);
   const totalSpent = rows.reduce((s, c) => s + c.spent, 0);
   const totalBudget = rows.reduce((s, c) => s + (c.monthlyLimit ?? 0), 0);
@@ -54,13 +60,12 @@ function buildReportHtml(categories: Category[], expenses: Expense[], limits: Ca
     )
     .join('');
 
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const anchor = new Date(monthAnchor);
+  const daysInMonth = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate();
   const dailyTotals = new Array(daysInMonth).fill(0);
   expenses.forEach((e) => {
-    const d = new Date(e.expenseDate);
-    const now = new Date();
-    if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
-      dailyTotals[d.getDate() - 1] += e.amount;
+    if (isSameMonth(e.expenseDate, monthAnchor)) {
+      dailyTotals[new Date(e.expenseDate).getDate() - 1] += e.amount;
     }
   });
   const maxDaily = Math.max(1, ...dailyTotals);
@@ -100,7 +105,7 @@ function buildReportHtml(categories: Category[], expenses: Expense[], limits: Ca
     </style>
   </head>
   <body>
-    <h1>Personal Finance Report</h1>
+    <h1>Pocket · ${monthLabel}</h1>
     <div class="muted">Generated on ${generatedOn}</div>
 
     <div class="stat-row">
@@ -110,7 +115,7 @@ function buildReportHtml(categories: Category[], expenses: Expense[], limits: Ca
     </div>
 
     <section>
-      <h2>Category Spending</h2>
+      <h2>Category Spending · ${monthLabel}</h2>
       ${categoryBarsHtml || '<div class="muted">No expenses recorded this month.</div>'}
     </section>
 
@@ -120,19 +125,24 @@ function buildReportHtml(categories: Category[], expenses: Expense[], limits: Ca
     </section>
 
     <section>
-      <h2>Monthly Spending</h2>
+      <h2>Daily Spending · ${monthLabel}</h2>
       <div class="day-chart">${dailyBarsHtml}</div>
     </section>
   </body>
   </html>`;
 }
 
-export async function exportPdf(categories: Category[], expenses: Expense[], limits: CategoryLimit[]): Promise<string> {
-  const html = buildReportHtml(categories, expenses, limits);
+export async function exportPdf(
+  categories: Category[],
+  expenses: Expense[],
+  limits: CategoryLimit[],
+  monthAnchor: number = Date.now()
+): Promise<string> {
+  const html = buildReportHtml(categories, expenses, limits, monthAnchor);
   const { uri } = await Print.printToFileAsync({ html, base64: false });
 
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Export Report (PDF)', UTI: 'com.adobe.pdf' });
+    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Export ${formatMonthYearLabel(monthAnchor)} (PDF)`, UTI: 'com.adobe.pdf' });
   }
 
   return uri;
