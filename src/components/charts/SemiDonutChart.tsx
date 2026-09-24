@@ -14,6 +14,7 @@ export interface ChartSegment {
 interface SemiDonutChartProps {
   segments: ChartSegment[];
   total: number;
+  caption: string;
   trackColor: string;
   textColor: string;
   secondaryTextColor: string;
@@ -32,7 +33,7 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number) {
   return `M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`;
 }
 
-export function SemiDonutChart({ segments, total, trackColor, textColor, secondaryTextColor, width = 240 }: SemiDonutChartProps) {
+export function SemiDonutChart({ segments, total, caption, trackColor, textColor, secondaryTextColor, width = 240 }: SemiDonutChartProps) {
   // Tall enough that the thicker stroke clears the top edge of the viewBox.
   const height = width * (140 / 240);
   const cx = width / 2;
@@ -62,7 +63,7 @@ export function SemiDonutChart({ segments, total, trackColor, textColor, seconda
       </Svg>
       <Animated.View entering={FadeIn.duration(400)} style={styles.centerLabel}>
         <AppText weight="extrabold" style={[styles.total, { color: textColor }]}>{formatMoney(total)}</AppText>
-        <AppText weight="medium" style={[styles.caption, { color: secondaryTextColor }]}>Total spending this month</AppText>
+        <AppText weight="medium" style={[styles.caption, { color: secondaryTextColor }]}>{caption}</AppText>
       </Animated.View>
     </View>
   );

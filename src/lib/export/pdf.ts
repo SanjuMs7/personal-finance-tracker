@@ -1,10 +1,11 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { colorForIcon, isSameMonth, withSpend } from '@/lib/calculations/budget';
-import { formatMonthYearLabel } from '@/lib/formatting/datetime';
+import { colorForIcon, withSpend } from '@/lib/calculations/budget';
+import { daysBetween, isInPeriod, periodLength } from '@/lib/calculations/period';
+import { formatDayLabel, formatRangeLabel } from '@/lib/formatting/datetime';
 import { formatMoney } from '@/lib/formatting/money';
-import type { Category, CategoryLimit, Expense } from '@/types';
+import type { Category, CategoryLimit, Expense, Period } from '@/types';
 
 function esc(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -20,12 +21,12 @@ function buildReportHtml(
   categories: Category[],
   expenses: Expense[],
   limits: CategoryLimit[],
-  monthAnchor: number
+  period: Period
 ): string {
-  const monthLabel = formatMonthYearLabel(monthAnchor);
-  const rows = withSpend(categories, expenses, limits, monthAnchor);
+  const periodLabel = formatRangeLabel(period.start, period.end);
+  const rows = withSpend(categories, expenses, limits, period);
   const totalSpent = rows.reduce((s, c) => s + c.spent, 0);
-  const totalBudget = rows.reduce((s, c) => s + (c.monthlyLimit ?? 0), 0);
+  const totalBudget = rows.reduce((s, c) => s + (c.limit ?? 0), 0);
   const remaining = totalBudget - totalSpent;
   const generatedOn = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -47,25 +48,27 @@ function buildReportHtml(
     .join('');
 
   const budgetRowsHtml = rows
-    .filter((c) => c.monthlyLimit != null)
+    .filter((c) => c.limit != null)
     .map(
       (c) => `
       <div class="budget-row">
         <div class="budget-top">
           <span class="budget-name">${esc(c.name)}</span>
-          <span class="budget-amounts">${formatMoney(c.spent)} / ${formatMoney(c.monthlyLimit ?? 0)} · ${c.percent}%</span>
+          <span class="budget-amounts">${formatMoney(c.spent)} / ${formatMoney(c.limit ?? 0)} · ${c.percent}%</span>
         </div>
         <div class="bar-track"><div class="bar-fill" style="width:${Math.min(c.percent, 100)}%;background:${statusColor(c.status)}"></div></div>
       </div>`
     )
     .join('');
 
-  const anchor = new Date(monthAnchor);
-  const daysInMonth = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate();
-  const dailyTotals = new Array(daysInMonth).fill(0);
+  // One bar per day of the period, indexed by its offset from the start rather
+  // than by day-of-month, so a range that crosses a month still lines up.
+  const totalDays = periodLength(period);
+  const dailyTotals: number[] = new Array(totalDays).fill(0);
   expenses.forEach((e) => {
-    if (isSameMonth(e.expenseDate, monthAnchor)) {
-      dailyTotals[new Date(e.expenseDate).getDate() - 1] += e.amount;
+    if (isInPeriod(e.expenseDate, period)) {
+      const index = daysBetween(period.start, e.expenseDate);
+      if (index >= 0 && index < totalDays) dailyTotals[index] += e.amount;
     }
   });
   const maxDaily = Math.max(1, ...dailyTotals);
@@ -105,7 +108,7 @@ function buildReportHtml(
     </style>
   </head>
   <body>
-    <h1>Pocket · ${monthLabel}</h1>
+    <h1>Pocket · ${periodLabel}</h1>
     <div class="muted">Generated on ${generatedOn}</div>
 
     <div class="stat-row">
@@ -115,7 +118,7 @@ function buildReportHtml(
     </div>
 
     <section>
-      <h2>Category Spending · ${monthLabel}</h2>
+      <h2>Category Spending · ${periodLabel}</h2>
       ${categoryBarsHtml || '<div class="muted">No expenses recorded this month.</div>'}
     </section>
 
@@ -125,7 +128,7 @@ function buildReportHtml(
     </section>
 
     <section>
-      <h2>Daily Spending · ${monthLabel}</h2>
+      <h2>Daily Spending · ${formatDayLabel(period.start)} to ${formatDayLabel(period.end)}</h2>
       <div class="day-chart">${dailyBarsHtml}</div>
     </section>
   </body>
@@ -136,13 +139,17 @@ export async function exportPdf(
   categories: Category[],
   expenses: Expense[],
   limits: CategoryLimit[],
-  monthAnchor: number = Date.now()
+  period: Period
 ): Promise<string> {
-  const html = buildReportHtml(categories, expenses, limits, monthAnchor);
+  const html = buildReportHtml(categories, expenses, limits, period);
   const { uri } = await Print.printToFileAsync({ html, base64: false });
 
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Export ${formatMonthYearLabel(monthAnchor)} (PDF)`, UTI: 'com.adobe.pdf' });
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `Export ${formatRangeLabel(period.start, period.end)} (PDF)`,
+      UTI: 'com.adobe.pdf',
+    });
   }
 
   return uri;

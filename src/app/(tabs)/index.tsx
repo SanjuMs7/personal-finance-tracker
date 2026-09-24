@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,13 +7,14 @@ import Svg, { Line, Path } from 'react-native-svg';
 import { AppText } from '@/components/common/AppText';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Icon } from '@/components/common/Icon';
-import { MonthSwitcher } from '@/components/common/MonthSwitcher';
+import { PeriodSwitcher } from '@/components/common/PeriodSwitcher';
 import { CategoryBarChart, type BarDatum } from '@/components/charts/CategoryBarChart';
 import { SemiDonutChart, type ChartSegment } from '@/components/charts/SemiDonutChart';
 import { Radius, Spacing } from '@/constants/theme';
-import { useMonthNavigation } from '@/hooks/use-month-navigation';
+import { usePeriod } from '@/hooks/use-period';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForIcon, isSameMonth, limitForMonth, totalSpending } from '@/lib/calculations/budget';
+import { colorForIcon, limitForPeriod, totalSpending } from '@/lib/calculations/budget';
+import { isInPeriod } from '@/lib/calculations/period';
 import { formatDateGroupLabel, formatFriendlyTime } from '@/lib/formatting/datetime';
 import { formatMoney } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
@@ -44,60 +45,63 @@ export default function HomeScreen() {
   const expenses = useAppStore((s) => s.expenses);
   const limits = useAppStore((s) => s.limits);
 
-  const nav = useMonthNavigation();
-  const monthAnchor = nav.monthAnchor;
+  const nav = usePeriod();
+  const period = nav.period;
+  const renewDismissed = useAppStore((s) => s.renewDismissed);
+  const dismissRenew = useAppStore((s) => s.dismissRenew);
   const { width } = useWindowDimensions();
   const [showBars, setShowBars] = useState(false);
-  const monthExpenses = useMemo(() => expenses.filter((e) => isSameMonth(e.expenseDate, monthAnchor)), [expenses, monthAnchor]);
-  const total = useMemo(() => totalSpending(expenses, monthAnchor), [expenses, monthAnchor]);
+
+  // The renew prompt opens itself once the set period has run out. Dismissing is
+  // recorded up front so it asks once a session; the pill stays red until a new
+  // period is set, and setting one clears the flag again.
+  useEffect(() => {
+    if (!nav.ended || renewDismissed) return;
+    dismissRenew();
+    router.push({ pathname: '/period', params: { mode: 'renew' } });
+  }, [nav.ended, renewDismissed, dismissRenew]);
+
+  const periodExpenses = useMemo(() => expenses.filter((e) => isInPeriod(e.expenseDate, period)), [expenses, period]);
+  const total = useMemo(() => totalSpending(expenses, period), [expenses, period]);
 
   // Arcs follow the Limits grid's order, matching the bar view, so a colour keeps
   // its position in the sweep instead of jumping as the amounts change.
   const chartSegments: ChartSegment[] = useMemo(() => {
     const byCategory = new Map<string, number>();
-    monthExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
+    periodExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
     return [...categories]
       .sort(
         (a, b) =>
-          Number(limitForMonth(limits, b.id, monthAnchor) != null) -
-          Number(limitForMonth(limits, a.id, monthAnchor) != null)
+          Number(limitForPeriod(limits, b.id, period) != null) -
+          Number(limitForPeriod(limits, a.id, period) != null)
       )
       .map((c) => ({ key: c.id, value: byCategory.get(c.id) ?? 0, color: colorForIcon(c.icon) }))
       .filter((s) => s.value > 0);
-  }, [categories, monthExpenses, limits, monthAnchor]);
-
-  // A past month is over, so it counts in full; the current one only counts the
-  // days that have actually happened.
-  const daysElapsed = useMemo(() => {
-    const viewed = new Date(monthAnchor);
-    const today = new Date(nav.dayAnchor);
-    const isCurrent = viewed.getFullYear() === today.getFullYear() && viewed.getMonth() === today.getMonth();
-    return isCurrent ? today.getDate() : new Date(viewed.getFullYear(), viewed.getMonth() + 1, 0).getDate();
-  }, [monthAnchor, nav.dayAnchor]);
+  }, [categories, periodExpenses, limits, period]);
 
   // Bars follow the Limits grid's order — limited categories first, newest first
   // within each group — so a category keeps its slot as you step through months.
   const dailyAverages: BarDatum[] = useMemo(() => {
     const byCategory = new Map<string, number>();
-    monthExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
+    periodExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
     return [...categories]
       .sort(
         (a, b) =>
-          Number(limitForMonth(limits, b.id, monthAnchor) != null) -
-          Number(limitForMonth(limits, a.id, monthAnchor) != null)
+          Number(limitForPeriod(limits, b.id, period) != null) -
+          Number(limitForPeriod(limits, a.id, period) != null)
       )
       .map((c) => ({
         key: c.id,
         label: c.name,
         icon: c.icon,
         color: colorForIcon(c.icon),
-        value: Math.round((byCategory.get(c.id) ?? 0) / daysElapsed),
+        value: Math.round((byCategory.get(c.id) ?? 0) / nav.elapsed),
       }));
-  }, [categories, monthExpenses, daysElapsed, limits, monthAnchor]);
+  }, [categories, periodExpenses, nav.elapsed, limits, period]);
 
   // Grouped by day, newest first, so nothing is hidden just for not being today.
   const sections = useMemo(() => {
-    const rows = [...monthExpenses]
+    const rows = [...periodExpenses]
       .sort((a, b) => b.expenseDate - a.expenseDate)
       .map((e) => {
         const category = categories.find((c) => c.id === e.categoryId);
@@ -126,7 +130,7 @@ export default function HomeScreen() {
       }
     });
     return groups;
-  }, [monthExpenses, categories, colors.textSecondary, nav.dayAnchor]);
+  }, [periodExpenses, categories, colors.textSecondary, nav.dayAnchor]);
 
   const hasAnyExpenses = expenses.length > 0;
 
@@ -140,7 +144,7 @@ export default function HomeScreen() {
           <AppText weight="extrabold" style={[styles.headerTitle, { color: colors.textPrimary }]}>
             Spending
           </AppText>
-          <MonthSwitcher nav={nav} />
+          <PeriodSwitcher nav={nav} onEditPeriod={() => router.push('/period')} />
         </View>
 
         {hasAnyExpenses ? (
@@ -154,8 +158,8 @@ export default function HomeScreen() {
               {showBars ? (
                 <CategoryBarChart
                   data={dailyAverages}
-                  total={Math.round(total / daysElapsed)}
-                  caption={`Average per day · ${daysElapsed} ${daysElapsed === 1 ? 'day' : 'days'}`}
+                  total={Math.round(total / nav.elapsed)}
+                  caption={`Average per day · ${nav.elapsed} ${nav.elapsed === 1 ? 'day' : 'days'}`}
                   width={width - Spacing.xl * 2 - 40}
                   trackColor={colors.trackColor}
                   textColor={colors.textPrimary}
@@ -165,6 +169,7 @@ export default function HomeScreen() {
                 <SemiDonutChart
                   segments={chartSegments}
                   total={total}
+                  caption="Total spending this period"
                   trackColor={colors.trackColor}
                   textColor={colors.textPrimary}
                   secondaryTextColor={colors.textSecondary}
@@ -190,7 +195,7 @@ export default function HomeScreen() {
 
             {sections.length === 0 ? (
               <View style={[styles.emptyMonthCard, { backgroundColor: colors.surface, shadowColor: colors.textPrimary }]}>
-                <AppText style={{ fontSize: 13.5, color: colors.textSecondary }}>No expenses this month.</AppText>
+                <AppText style={{ fontSize: 13.5, color: colors.textSecondary }}>No expenses in this period.</AppText>
               </View>
             ) : null}
 

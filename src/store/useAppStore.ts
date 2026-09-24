@@ -2,8 +2,8 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { create } from 'zustand';
 
 import * as db from '@/database/queries';
-import { monthIndexOf } from '@/lib/calculations/budget';
-import type { Category, CategoryLimit, Expense, IconKey, ThemePreference } from '@/types';
+import { monthPeriod } from '@/lib/calculations/period';
+import type { Category, CategoryLimit, Expense, IconKey, Period, ThemePreference } from '@/types';
 
 interface AppState {
   database: SQLiteDatabase | null;
@@ -12,17 +12,23 @@ interface AppState {
   expenses: Expense[];
   limits: CategoryLimit[];
   themePreference: ThemePreference;
-  /** Months back from the current one that the Home and Limits screens are showing.
-   *  0 is this month; it is relative, so it never goes stale across a rollover. */
-  monthOffset: number;
+  /** The spending period the user set. Everything the app counts reads it. */
+  period: Period;
+  /** Whole periods away from `period` that the screens are showing; 0 is the one
+   *  the user set. Kept as an offset so browsing never outlives the session. */
+  periodOffset: number;
+  /** Set when the user waves away the renew prompt, so it asks once per session. */
+  renewDismissed: boolean;
 
   hydrate: (database: SQLiteDatabase) => Promise<void>;
-  setMonthOffset: (offset: number) => void;
+  setPeriod: (period: Period) => Promise<void>;
+  setPeriodOffset: (offset: number) => void;
+  dismissRenew: () => void;
 
   addCategory: (input: { name: string; icon: IconKey }) => Promise<Category>;
   updateCategory: (id: string, input: { name: string; icon: IconKey }) => Promise<void>;
-  /** Sets the limit that applies from the month containing `monthAnchor` onward. */
-  setCategoryLimit: (categoryId: string, monthAnchor: number, amount: number | null) => Promise<void>;
+  /** Sets the limit that applies from `effectiveFrom` — a period's start day — onward. */
+  setCategoryLimit: (categoryId: string, effectiveFrom: number, amount: number | null) => Promise<void>;
   deleteCategorySimple: (id: string) => Promise<void>;
   deleteCategoryAndReassign: (id: string, targetCategoryId: string) => Promise<void>;
   deleteCategoryAndExpenses: (id: string) => Promise<void>;
@@ -44,18 +50,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   expenses: [],
   limits: [],
   themePreference: 'system',
-  monthOffset: 0,
+  period: monthPeriod(Date.now()),
+  periodOffset: 0,
+  renewDismissed: false,
 
-  setMonthOffset: (offset) => set({ monthOffset: offset }),
+  setPeriodOffset: (offset) => set({ periodOffset: offset }),
+
+  dismissRenew: () => set({ renewDismissed: true }),
+
+  setPeriod: async (period) => {
+    const { database } = get();
+    // Land on the new period straight away; a fresh one is never a dismissed one.
+    set({ period, periodOffset: 0, renewDismissed: false });
+    if (!database) return;
+    try {
+      await db.setPeriod(database, period);
+    } catch (err) {
+      console.warn('Failed to persist period', err);
+    }
+  },
 
   hydrate: async (database) => {
-    const [categories, expenses, limits, themePreference] = await Promise.all([
+    const [categories, expenses, limits, themePreference, period] = await Promise.all([
       db.getAllCategories(database),
       db.getAllExpenses(database),
       db.getAllLimits(database),
       db.getTheme(database),
+      db.getPeriod(database),
     ]);
-    set({ database, categories, expenses, limits, themePreference, hydrated: true });
+    set({
+      database,
+      categories,
+      expenses,
+      limits,
+      themePreference,
+      period: period ?? monthPeriod(Date.now()),
+      hydrated: true,
+    });
   },
 
   addCategory: async (input) => {
@@ -75,13 +106,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  setCategoryLimit: async (categoryId, monthAnchor, amount) => {
+  setCategoryLimit: async (categoryId, effectiveFrom, amount) => {
     const { database, limits } = get();
     if (!database) throw new Error('Database not ready');
-    const effectiveMonth = monthIndexOf(monthAnchor);
-    await db.setCategoryLimit(database, categoryId, effectiveMonth, amount);
-    const others = limits.filter((l) => !(l.categoryId === categoryId && l.effectiveMonth === effectiveMonth));
-    set({ limits: [...others, { categoryId, effectiveMonth, amount }] });
+    await db.setCategoryLimit(database, categoryId, effectiveFrom, amount);
+    const others = limits.filter((l) => !(l.categoryId === categoryId && l.effectiveFrom === effectiveFrom));
+    set({ limits: [...others, { categoryId, effectiveFrom, amount }] });
   },
 
   deleteCategorySimple: async (id) => {

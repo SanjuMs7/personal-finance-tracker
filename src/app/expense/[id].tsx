@@ -5,12 +5,12 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { AppText } from '@/components/common/AppText';
 import { BottomSheet } from '@/components/common/BottomSheet';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
-import { DateTimeField } from '@/components/common/DateTimeField';
 import { Icon } from '@/components/common/Icon';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { colorForIcon } from '@/lib/calculations/budget';
+import { dayOf } from '@/lib/calculations/period';
 import { formatMoneyInput } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
 import type { IconKey } from '@/types';
@@ -29,6 +29,8 @@ export default function ExpenseFormScreen() {
   const addExpense = useAppStore((s) => s.addExpense);
   const updateExpense = useAppStore((s) => s.updateExpense);
   const deleteExpense = useAppStore((s) => s.deleteExpense);
+  const setPeriodOffset = useAppStore((s) => s.setPeriodOffset);
+  const period = useAppStore((s) => s.period);
 
   const isNew = id === 'new';
   const existing = useMemo(() => expenses.find((e) => e.id === id), [expenses, id]);
@@ -36,10 +38,14 @@ export default function ExpenseFormScreen() {
   const [name, setName] = useState(existing?.name ?? '');
   const [amountText, setAmountText] = useState(existing ? formatMoneyInput(existing.amount) : '');
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null);
-  const [date, setDate] = useState(existing ? new Date(existing.expenseDate) : new Date());
 
   const [categoryListOpen, setCategoryListOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // A finished period is a record, not a draft. Anything dated before the start
+  // of the period in force can be read but not changed or removed, so old totals
+  // and graphs can never shift under you.
+  const locked = !isNew && existing != null && existing.expenseDate < dayOf(period.start);
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   // Icon and colour are the category's; an expense has none of its own.
@@ -47,7 +53,8 @@ export default function ExpenseFormScreen() {
   const chipColor = selectedCategory ? colorForIcon(icon) : colors.textSecondary;
 
   const amountValue = parseFloat(amountText);
-  const isValid = name.trim().length > 0 && !Number.isNaN(amountValue) && amountValue > 0 && !!categoryId;
+  const isValid =
+    !locked && name.trim().length > 0 && !Number.isNaN(amountValue) && amountValue > 0 && !!categoryId;
 
   function close() {
     router.back();
@@ -56,16 +63,23 @@ export default function ExpenseFormScreen() {
   async function handleSave() {
     if (!isValid || !categoryId) return;
     const amountPaise = Math.round(amountValue * 100);
+    // The form no longer asks when: an expense is stamped the moment it is saved,
+    // on an edit as well as on an add.
+    const expenseDate = Date.now();
     if (isNew) {
-      await addExpense({ categoryId, name: name.trim(), amount: amountPaise, icon, expenseDate: date.getTime() });
+      await addExpense({ categoryId, name: name.trim(), amount: amountPaise, icon, expenseDate });
     } else if (existing) {
-      await updateExpense(existing.id, { categoryId, name: name.trim(), amount: amountPaise, icon, expenseDate: date.getTime() });
+      await updateExpense(existing.id, { categoryId, name: name.trim(), amount: amountPaise, icon, expenseDate });
     }
+    // Older periods are for looking at. Whatever was just saved belongs to the
+    // set period, so step the screens back to it rather than leaving the user
+    // on a window the expense is not in.
+    setPeriodOffset(0);
     close();
   }
 
   async function handleDelete() {
-    if (existing) {
+    if (existing && !locked) {
       await deleteExpense(existing.id);
     }
     setDeleteOpen(false);
@@ -81,7 +95,12 @@ export default function ExpenseFormScreen() {
         footer={
           <>
             <PrimaryButton label={isNew ? 'Add Expense' : 'Save Changes'} onPress={handleSave} disabled={!isValid} />
-            {!isNew && (
+            {locked ? (
+              <AppText style={[styles.lockNote, { color: colors.textSecondary }]}>
+                This period is over. Kept as a record.
+              </AppText>
+            ) : null}
+            {!isNew && !locked && (
               <Pressable onPress={() => setDeleteOpen(true)} style={styles.deleteBtn}>
                 <AppText weight="bold" style={{ fontSize: 13.5, color: colors.danger }}>Delete Expense</AppText>
               </Pressable>
@@ -91,7 +110,7 @@ export default function ExpenseFormScreen() {
       >
         <View style={styles.header}>
           <AppText weight="extrabold" style={{ fontSize: 17, color: colors.textPrimary }}>
-            {isNew ? 'Add Expense' : 'Edit Expense'}
+            {isNew ? 'Add Expense' : locked ? 'Expense' : 'Edit Expense'}
           </AppText>
           <Pressable onPress={close} style={[styles.closeBtn, { backgroundColor: colors.surfaceAlt }]}>
             <CloseGlyph color={colors.textSecondary} />
@@ -109,6 +128,7 @@ export default function ExpenseFormScreen() {
                 placeholder="0"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="decimal-pad"
+                editable={!locked}
                 style={[styles.amountInput, { color: colors.textPrimary }]}
                 autoFocus={isNew}
               />
@@ -122,6 +142,7 @@ export default function ExpenseFormScreen() {
               onChangeText={setName}
               placeholder="e.g. Lunch"
               placeholderTextColor={colors.textSecondary}
+              editable={!locked}
               style={[styles.textInput, { backgroundColor: colors.surfaceAlt, color: colors.textPrimary }]}
             />
           </View>
@@ -130,6 +151,7 @@ export default function ExpenseFormScreen() {
             <AppText weight="semibold" style={{ fontSize: 12.5, color: colors.textSecondary, marginBottom: 6 }}>Category</AppText>
             <Pressable
               onPress={() => setCategoryListOpen((v) => !v)}
+              disabled={locked}
               accessibilityRole="button"
               accessibilityLabel="Choose category"
               style={[styles.categoryBtn, { backgroundColor: colors.surfaceAlt }]}
@@ -140,9 +162,11 @@ export default function ExpenseFormScreen() {
               <AppText weight="bold" numberOfLines={1} style={{ flex: 1, fontSize: 13.5, color: colors.textPrimary }}>
                 {selectedCategory?.name ?? 'Select category'}
               </AppText>
-              <AppText weight="bold" style={{ fontSize: 12, color: colors.textSecondary }}>
-                {categoryListOpen ? 'Close' : 'Change'}
-              </AppText>
+              {locked ? null : (
+                <AppText weight="bold" style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {categoryListOpen ? 'Close' : 'Change'}
+                </AppText>
+              )}
             </Pressable>
 
             {categoryListOpen ? (
@@ -180,11 +204,6 @@ export default function ExpenseFormScreen() {
             ) : null}
           </View>
 
-          <View style={styles.field}>
-            <AppText weight="semibold" style={{ fontSize: 12.5, color: colors.textSecondary, marginBottom: 6 }}>Date &amp; time</AppText>
-            <DateTimeField value={date} onChange={setDate} />
-          </View>
-
         </View>
       </BottomSheet>
 
@@ -213,4 +232,5 @@ const styles = StyleSheet.create({
   categoryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 12, paddingHorizontal: 12, borderRadius: Radius.md },
   smallIcon: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { alignItems: 'center', paddingTop: Spacing.sm, paddingBottom: Spacing.sm },
+  lockNote: { fontSize: 12.5, textAlign: 'center', paddingTop: Spacing.sm, paddingBottom: Spacing.xs },
 });

@@ -6,14 +6,16 @@ import Svg, { Path } from 'react-native-svg';
 import { AppText } from '@/components/common/AppText';
 import { BottomSheet } from '@/components/common/BottomSheet';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { DateRangeSheet } from '@/components/common/DateRangeSheet';
 import { ICON_KEYS, ICON_LABELS, Icon } from '@/components/common/Icon';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { MoveCategoryDialog } from '@/components/limits/MoveCategoryDialog';
 import { Radius, Spacing } from '@/constants/theme';
-import { useMonthNavigation } from '@/hooks/use-month-navigation';
+import { usePeriod } from '@/hooks/use-period';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForIcon, limitForMonth } from '@/lib/calculations/budget';
-import { formatMonthYearLabel } from '@/lib/formatting/datetime';
+import { colorForIcon, limitForPeriod } from '@/lib/calculations/budget';
+import { periodLength } from '@/lib/calculations/period';
+import { formatRangeLabel } from '@/lib/formatting/datetime';
 import { formatMoneyInput } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
 import type { IconKey } from '@/types';
@@ -45,9 +47,13 @@ export default function CategoryFormScreen() {
   const deleteCategoryAndReassign = useAppStore((s) => s.deleteCategoryAndReassign);
   const deleteCategoryAndExpenses = useAppStore((s) => s.deleteCategoryAndExpenses);
 
-  // Limits are edited for the month you are looking at, so what you see on the
+  // Limits are edited for the period you are looking at, so what you see on the
   // Limits screen is what this sheet changes.
-  const { monthAnchor } = useMonthNavigation();
+  const nav = usePeriod();
+  const period = nav.period;
+  // Stepping the pill back is browsing, not editing: a period that is over keeps
+  // the limit it ran under, so the totals and graphs already drawn stay true.
+  const periodLocked = useAppStore((s) => s.periodOffset) < 0;
   const isNew = id === 'new';
   const existing = useMemo(() => (isNew ? undefined : categories.find((c) => c.id === id)), [categories, id, isNew]);
   const expenseCount = useMemo(() => expenses.filter((e) => e.categoryId === id).length, [expenses, id]);
@@ -64,12 +70,13 @@ export default function CategoryFormScreen() {
     existing?.icon ?? ICON_KEYS.find((k) => !categories.some((c) => c.icon === k)) ?? 'other'
   );
   const limitInForce = useMemo(
-    () => (existing ? limitForMonth(limits, existing.id, monthAnchor) : null),
-    [existing, limits, monthAnchor]
+    () => (existing ? limitForPeriod(limits, existing.id, period) : null),
+    [existing, limits, period]
   );
   const [limitText, setLimitText] = useState(limitInForce != null ? formatMoneyInput(limitInForce) : '');
 
   const [iconListOpen, setIconListOpen] = useState(false);
+  const [rangeOpen, setRangeOpen] = useState(false);
   const [simpleDeleteOpen, setSimpleDeleteOpen] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [moveTargetId, setMoveTargetId] = useState<string | null>(otherCategories[0]?.id ?? null);
@@ -101,16 +108,16 @@ export default function CategoryFormScreen() {
   async function handleSave() {
     if (!isValid) return;
     const parsed = limitText.trim() === '' ? null : Math.max(0, Math.round(parseFloat(limitText) * 100));
-    const monthlyLimit = parsed === null || Number.isNaN(parsed) ? null : parsed;
+    const limit = parsed === null || Number.isNaN(parsed) ? null : parsed;
 
     if (isNew) {
       const created = await addCategory({ name: name.trim(), icon });
-      if (monthlyLimit != null) await setCategoryLimit(created.id, monthAnchor, monthlyLimit);
+      if (limit != null) await setCategoryLimit(created.id, period.start, limit);
     } else if (existing) {
       await updateCategory(existing.id, { name: name.trim(), icon });
       // Only record a change: an unchanged limit would add a redundant row that
-      // pins this month's value and blocks earlier edits from carrying forward.
-      if (monthlyLimit !== limitInForce) await setCategoryLimit(existing.id, monthAnchor, monthlyLimit);
+      // pins this period's value and blocks earlier edits from carrying forward.
+      if (!periodLocked && limit !== limitInForce) await setCategoryLimit(existing.id, period.start, limit);
     }
     close();
   }
@@ -256,7 +263,7 @@ export default function CategoryFormScreen() {
           </View>
 
           <View>
-            <AppText weight="semibold" style={{ fontSize: 12.5, color: colors.textSecondary, marginBottom: 6 }}>Monthly Limit (optional)</AppText>
+            <AppText weight="semibold" style={{ fontSize: 12.5, color: colors.textSecondary, marginBottom: 6 }}>Limit for this period (optional)</AppText>
             <View style={[styles.limitRow, { backgroundColor: colors.surfaceAlt }]}>
               <AppText weight="bold" style={{ color: colors.textSecondary }}>₹</AppText>
               <TextInput
@@ -265,16 +272,37 @@ export default function CategoryFormScreen() {
                 placeholder="No limit"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="decimal-pad"
+                editable={!periodLocked}
                 style={[styles.limitInput, { color: colors.textPrimary }]}
               />
             </View>
             <AppText style={{ fontSize: 11.5, color: colors.textSecondary, marginTop: 6 }}>
-              Applies from {formatMonthYearLabel(monthAnchor)} onward. Earlier months keep their own limit.
+              {periodLocked
+                ? `${formatRangeLabel(period.start, period.end)} is over. Its limit is kept as a record and can't be changed.`
+                : `Applies from ${formatRangeLabel(period.start, period.end)} (${periodLength(period)} days) onward. Earlier periods keep their own limit.`}
             </AppText>
+            <Pressable
+              onPress={() => setRangeOpen(true)}
+              accessibilityRole="button"
+              style={styles.changePeriod}
+            >
+              <AppText weight="bold" style={{ fontSize: 11.5, color: colors.primary }}>Change the period</AppText>
+            </Pressable>
           </View>
 
         </View>
       </BottomSheet>
+
+      <DateRangeSheet
+        visible={rangeOpen}
+        initial={period}
+        today={nav.dayAnchor}
+        onClose={() => setRangeOpen(false)}
+        onSave={(next) => {
+          setRangeOpen(false);
+          nav.setPeriod(next);
+        }}
+      />
 
       {existing ? (
         <>
@@ -315,6 +343,7 @@ const styles = StyleSheet.create({
   iconPreview: { width: 64, height: 64, borderRadius: Radius.xl, alignItems: 'center', justifyContent: 'center' },
   textInput: { width: '100%', paddingVertical: 13, paddingHorizontal: 14, borderRadius: Radius.md, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold' },
   limitRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 13, paddingHorizontal: 14, borderRadius: Radius.md },
+  changePeriod: { alignSelf: 'flex-start', paddingVertical: 6 },
   limitInput: { flex: 1, fontSize: 14, padding: 0, fontFamily: 'PlusJakartaSans_700Bold' },
   deleteBtn: { alignItems: 'center', paddingTop: Spacing.sm, paddingBottom: Spacing.sm },
 });

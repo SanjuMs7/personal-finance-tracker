@@ -98,6 +98,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="expense/[id]" options={{ presentation: 'transparentModal', animation: 'fade' }} />
               <Stack.Screen name="category/[id]" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+              <Stack.Screen name="period" options={{ presentation: 'transparentModal', animation: 'fade' }} />
             </Stack>
           </Hydrator>
         </SQLiteProvider>

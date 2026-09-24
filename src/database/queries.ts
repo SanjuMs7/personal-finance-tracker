@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import type { Category, CategoryLimit, Expense, IconKey, ThemePreference } from '@/types';
+import type { Category, CategoryLimit, Expense, IconKey, Period, ThemePreference } from '@/types';
 
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -16,7 +16,7 @@ interface CategoryRow {
 
 interface CategoryLimitRow {
   category_id: string;
-  effective_month: number;
+  effective_from: number;
   amount: number | null;
 }
 
@@ -98,22 +98,22 @@ export async function deleteCategory(db: SQLiteDatabase, id: string): Promise<vo
 }
 
 export async function getAllLimits(db: SQLiteDatabase): Promise<CategoryLimit[]> {
-  const rows = await db.getAllAsync<CategoryLimitRow>('SELECT * FROM category_limits ORDER BY effective_month ASC');
-  return rows.map((r) => ({ categoryId: r.category_id, effectiveMonth: r.effective_month, amount: r.amount }));
+  const rows = await db.getAllAsync<CategoryLimitRow>('SELECT * FROM category_limits ORDER BY effective_from ASC');
+  return rows.map((r) => ({ categoryId: r.category_id, effectiveFrom: r.effective_from, amount: r.amount }));
 }
 
-/** Records the limit that applies from `effectiveMonth` onward; null means no limit. */
+/** Records the limit that applies from `effectiveFrom` onward; null means no limit. */
 export async function setCategoryLimit(
   db: SQLiteDatabase,
   categoryId: string,
-  effectiveMonth: number,
+  effectiveFrom: number,
   amount: number | null
 ): Promise<void> {
   await db.runAsync(
-    `INSERT INTO category_limits (category_id, effective_month, amount) VALUES (?, ?, ?)
-     ON CONFLICT(category_id, effective_month) DO UPDATE SET amount = excluded.amount`,
+    `INSERT INTO category_limits (category_id, effective_from, amount) VALUES (?, ?, ?)
+     ON CONFLICT(category_id, effective_from) DO UPDATE SET amount = excluded.amount`,
     categoryId,
-    effectiveMonth,
+    effectiveFrom,
     amount
   );
 }
@@ -189,4 +189,20 @@ export async function getTheme(db: SQLiteDatabase): Promise<ThemePreference> {
 
 export async function setTheme(db: SQLiteDatabase, theme: ThemePreference): Promise<void> {
   await db.runAsync('UPDATE settings SET theme = ? WHERE id = 1', theme);
+}
+
+export async function getPeriod(db: SQLiteDatabase): Promise<Period | null> {
+  const row = await db.getFirstAsync<{ start_at: number; end_at: number }>(
+    'SELECT start_at, end_at FROM period WHERE id = 1'
+  );
+  return row ? { start: row.start_at, end: row.end_at } : null;
+}
+
+export async function setPeriod(db: SQLiteDatabase, period: Period): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO period (id, start_at, end_at) VALUES (1, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET start_at = excluded.start_at, end_at = excluded.end_at`,
+    period.start,
+    period.end
+  );
 }

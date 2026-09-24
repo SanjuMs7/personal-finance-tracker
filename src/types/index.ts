@@ -27,16 +27,23 @@ export interface Category {
   updatedAt: number;
 }
 
+/** An inclusive run of days that spending is measured over. Both ends are
+ *  midday timestamps, so a DST shift can never tip either into the next day. */
+export interface Period {
+  start: number;
+  end: number;
+}
+
 /**
- * A limit that takes effect in `effectiveMonth` and holds until a later row
- * replaces it. Storing changes this way keeps a past month showing the limit
- * that was actually in force at the time.
+ * A limit stamped with the start date of the period it was set in, holding
+ * until a later row replaces it. Storing changes this way keeps a past period
+ * showing the limit that was actually in force at the time.
  */
 export interface CategoryLimit {
   categoryId: string;
-  /** Month index: year * 12 + zero-based month. */
-  effectiveMonth: number;
-  /** Limit in paise, or null when the limit was removed from that month on. */
+  /** Start day of the period this limit takes effect in; 0 covers all history. */
+  effectiveFrom: number;
+  /** Limit in paise, or null when the limit was removed from that period on. */
   amount: number | null;
 }
 
@@ -56,8 +63,8 @@ export interface Expense {
 export type BudgetStatus = 'none' | 'normal' | 'warning' | 'danger';
 
 export interface CategoryWithSpend extends Category {
-  /** The limit in force for the month being viewed, in paise; null when none. */
-  monthlyLimit: number | null;
+  /** The limit in force for the period being viewed, in paise; null when none. */
+  limit: number | null;
   spent: number;
   percent: number;
   status: BudgetStatus;

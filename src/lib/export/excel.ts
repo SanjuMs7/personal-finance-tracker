@@ -2,9 +2,10 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 
-import { isSameMonth, withSpend } from '@/lib/calculations/budget';
-import { formatMonthYearLabel } from '@/lib/formatting/datetime';
-import type { Category, CategoryLimit, Expense } from '@/types';
+import { withSpend } from '@/lib/calculations/budget';
+import { isInPeriod, periodLength } from '@/lib/calculations/period';
+import { formatRangeLabel, formatRangeStamp } from '@/lib/formatting/datetime';
+import type { Category, CategoryLimit, Expense, Period } from '@/types';
 
 function toRupees(paise: number): number {
   return Math.round((paise / 100) * 100) / 100;
@@ -14,14 +15,14 @@ export async function exportExcel(
   categories: Category[],
   expenses: Expense[],
   limits: CategoryLimit[],
-  monthAnchor: number = Date.now()
+  period: Period
 ): Promise<string> {
-  const monthLabel = formatMonthYearLabel(monthAnchor);
-  const catRows = withSpend(categories, expenses, limits, monthAnchor);
+  const periodLabel = formatRangeLabel(period.start, period.end);
+  const catRows = withSpend(categories, expenses, limits, period);
 
-  // Scoped to the month the totals describe; the full history gets its own sheet
+  // Scoped to the period the totals describe; the full history gets its own sheet
   // below, so the numbers in one sheet always match the rows beside them.
-  const monthExpenses = expenses.filter((e) => isSameMonth(e.expenseDate, monthAnchor));
+  const periodExpenses = expenses.filter((e) => isInPeriod(e.expenseDate, period));
 
   const toRow = (e: Expense) => {
     const category = categories.find((c) => c.id === e.categoryId);
@@ -35,7 +36,7 @@ export async function exportExcel(
     };
   };
 
-  const expenseRows = monthExpenses
+  const expenseRows = periodExpenses
     .slice()
     .sort((a, b) => b.expenseDate - a.expenseDate)
     .map(toRow);
@@ -47,16 +48,17 @@ export async function exportExcel(
 
   const categoryRows = catRows.map((c) => ({
     Category: c.name,
-    'Monthly Limit (INR)': c.monthlyLimit != null ? toRupees(c.monthlyLimit) : 'No limit',
+    'Limit (INR)': c.limit != null ? toRupees(c.limit) : 'No limit',
     'Total Spent (INR)': toRupees(c.spent),
-    'Remaining (INR)': c.monthlyLimit != null ? toRupees(c.monthlyLimit - c.spent) : '—',
-    'Budget Usage %': c.monthlyLimit != null ? c.percent : '—',
+    'Remaining (INR)': c.limit != null ? toRupees(c.limit - c.spent) : '—',
+    'Budget Usage %': c.limit != null ? c.percent : '—',
   }));
 
   const totalSpent = catRows.reduce((sum, c) => sum + c.spent, 0);
-  const totalBudget = catRows.reduce((sum, c) => sum + (c.monthlyLimit ?? 0), 0);
+  const totalBudget = catRows.reduce((sum, c) => sum + (c.limit ?? 0), 0);
   const summaryRows = [
-    { Metric: 'Month', Value: monthLabel },
+    { Metric: 'Period', Value: periodLabel },
+    { Metric: 'Days', Value: periodLength(period) },
     { Metric: 'Total Spending (INR)', Value: toRupees(totalSpent) },
     { Metric: 'Total Budget (INR)', Value: toRupees(totalBudget) },
     { Metric: 'Total Remaining (INR)', Value: toRupees(totalBudget - totalSpent) },
@@ -66,7 +68,8 @@ export async function exportExcel(
 
   const expensesSheet = XLSX.utils.json_to_sheet(expenseRows);
   expensesSheet['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 26 }, { wch: 16 }, { wch: 14 }];
-  XLSX.utils.book_append_sheet(workbook, expensesSheet, monthLabel);
+  // Excel rejects : \ / ? * [ ] in a sheet name and truncates past 31 characters.
+  XLSX.utils.book_append_sheet(workbook, expensesSheet, periodLabel.replace(/[:\\/?*[\]]/g, '-').slice(0, 31));
 
   const categoriesSheet = XLSX.utils.json_to_sheet(categoryRows);
   categoriesSheet['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 16 }];
@@ -83,8 +86,7 @@ export async function exportExcel(
 
   const base64 = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' }) as string;
 
-  const stamp = new Date(monthAnchor);
-  const fileName = `pocket-${stamp.getFullYear()}-${String(stamp.getMonth() + 1).padStart(2, '0')}.xlsx`;
+  const fileName = `pocket-${formatRangeStamp(period.start, period.end)}.xlsx`;
   const file = new File(Paths.cache, fileName);
   if (file.exists) file.delete();
   file.create();
@@ -93,7 +95,7 @@ export async function exportExcel(
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(file.uri, {
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: `Export ${monthLabel} (Excel)`,
+      dialogTitle: `Export ${periodLabel} (Excel)`,
       UTI: 'org.openxmlformats.spreadsheetml.sheet',
     });
   }

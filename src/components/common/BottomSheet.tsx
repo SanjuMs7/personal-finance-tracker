@@ -48,8 +48,9 @@ export function BottomSheet({ visible, onClose, children, footer, maxHeight = '7
 
   if (!mounted) return null;
 
-  // Rendered in-tree rather than in a RN <Modal>: Android cannot stack sibling
-  // Modals, which silently swallowed every nested picker opened from a sheet.
+  // Rendered in-tree, never in a RN <Modal>: on this app's Fabric +
+  // edge-to-edge build a Modal draws nothing at all. A sheet that has to cover
+  // the floating tab bar belongs in a transparentModal route instead.
   return (
     <View style={StyleSheet.absoluteFill}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}>

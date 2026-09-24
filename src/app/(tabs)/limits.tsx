@@ -7,9 +7,9 @@ import Svg, { Circle, Line } from 'react-native-svg';
 import { AppText } from '@/components/common/AppText';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Icon } from '@/components/common/Icon';
-import { MonthSwitcher } from '@/components/common/MonthSwitcher';
+import { PeriodSwitcher } from '@/components/common/PeriodSwitcher';
 import { Radius, Spacing } from '@/constants/theme';
-import { useMonthNavigation } from '@/hooks/use-month-navigation';
+import { usePeriod } from '@/hooks/use-period';
 import { useTheme } from '@/hooks/use-theme';
 import { colorForIcon, withSpend } from '@/lib/calculations/budget';
 import { formatMoney } from '@/lib/formatting/money';
@@ -68,25 +68,25 @@ export default function LimitsScreen() {
   const categories = useAppStore((s) => s.categories);
   const expenses = useAppStore((s) => s.expenses);
   const limits = useAppStore((s) => s.limits);
-  const nav = useMonthNavigation();
-  const monthAnchor = nav.monthAnchor;
+  const nav = usePeriod();
+  const period = nav.period;
   const { width } = useWindowDimensions();
 
   // Categories carrying a limit float to the top; sort is stable, so within each
   // group the store's newest-first order is preserved.
   const ordered = useMemo(
-    () => withSpend(categories, expenses, limits, monthAnchor).sort((a, b) => Number(b.monthlyLimit != null) - Number(a.monthlyLimit != null)),
-    [categories, expenses, limits, monthAnchor]
+    () => withSpend(categories, expenses, limits, period).sort((a, b) => Number(b.limit != null) - Number(a.limit != null)),
+    [categories, expenses, limits, period]
   );
 
   // Header summary covers only the categories that actually carry a limit —
   // unlimited spending has nothing to be measured against.
   const summary = useMemo(() => {
-    const limited = ordered.filter((c) => c.monthlyLimit != null && c.monthlyLimit > 0);
+    const limited = ordered.filter((c) => c.limit != null && c.limit > 0);
     if (limited.length === 0) return null;
     return {
       spent: limited.reduce((sum, c) => sum + c.spent, 0),
-      limit: limited.reduce((sum, c) => sum + (c.monthlyLimit as number), 0),
+      limit: limited.reduce((sum, c) => sum + (c.limit as number), 0),
     };
   }, [ordered]);
 
@@ -109,7 +109,7 @@ export default function LimitsScreen() {
           <AppText weight="extrabold" style={[styles.headerTitle, { color: colors.textPrimary }]}>
             Limits
           </AppText>
-          <MonthSwitcher nav={nav} />
+          <PeriodSwitcher nav={nav} onEditPeriod={() => router.push('/period')} />
         </View>
 
         {summary ? (
@@ -122,7 +122,7 @@ export default function LimitsScreen() {
           <View style={styles.grid}>
             {ordered.map((category) => {
               const color = colorForIcon(category.icon);
-              const hasLimit = category.monthlyLimit != null && category.monthlyLimit > 0;
+              const hasLimit = category.limit != null && category.limit > 0;
               // Green while comfortably under, amber from 80%, red at the limit.
               const ringColor =
                 category.status === 'danger' ? colors.danger : category.status === 'warning' ? colors.warning : colors.success;
@@ -134,7 +134,7 @@ export default function LimitsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={
                     hasLimit
-                      ? `Edit ${category.name}, ${formatMoney(category.spent)} of ${formatMoney(category.monthlyLimit as number)} spent`
+                      ? `Edit ${category.name}, ${formatMoney(category.spent)} of ${formatMoney(category.limit as number)} spent`
                       : `Edit ${category.name}, no limit set`
                   }
                   style={({ pressed }) => [styles.tile, { width: tileWidth, opacity: pressed ? 0.7 : 1 }]}
@@ -168,7 +168,7 @@ export default function LimitsScreen() {
                         { color: category.status === 'danger' ? colors.danger : colors.textSecondary },
                       ]}
                     >
-                      {hasLimit ? `${formatMoney(category.spent)} / ${formatMoney(category.monthlyLimit as number)}` : 'No limit'}
+                      {hasLimit ? `${formatMoney(category.spent)} / ${formatMoney(category.limit as number)}` : 'No limit'}
                     </AppText>
                   </View>
                 </Pressable>
