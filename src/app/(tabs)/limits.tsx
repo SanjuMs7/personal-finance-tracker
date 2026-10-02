@@ -11,7 +11,7 @@ import { PeriodSwitcher } from '@/components/common/PeriodSwitcher';
 import { Radius, Spacing } from '@/constants/theme';
 import { usePeriod } from '@/hooks/use-period';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForIcon, withSpend } from '@/lib/calculations/budget';
+import { colorForIcon, compareForGrid, withSpend } from '@/lib/calculations/budget';
 import { formatMoney } from '@/lib/formatting/money';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -72,10 +72,8 @@ export default function LimitsScreen() {
   const period = nav.period;
   const { width } = useWindowDimensions();
 
-  // Categories carrying a limit float to the top; sort is stable, so within each
-  // group the store's newest-first order is preserved.
   const ordered = useMemo(
-    () => withSpend(categories, expenses, limits, period).sort((a, b) => Number(b.limit != null) - Number(a.limit != null)),
+    () => withSpend(categories, expenses, limits, period).sort(compareForGrid),
     [categories, expenses, limits, period]
   );
 
@@ -93,7 +91,7 @@ export default function LimitsScreen() {
   // Floored, not exact: Yoga rounds each tile up to a whole physical pixel, and
   // three exact thirds then overflow the row by a pixel and wrap to 2 columns.
   const tileWidth = Math.floor((width - Spacing.xl * 2 - GRID_GAP * 2) / 3);
-  const ringSize = Math.round(tileWidth * 0.6);
+  const ringSize = Math.round(tileWidth * 0.52);
 
   function openCategory(id: string) {
     router.push({ pathname: '/category/[id]', params: { id } });
@@ -145,6 +143,14 @@ export default function LimitsScreen() {
                       { width: tileWidth, height: tileWidth, backgroundColor: colors.surface, shadowColor: colors.textPrimary },
                     ]}
                   >
+                    <AppText
+                      weight="bold"
+                      numberOfLines={1}
+                      style={[styles.tileName, { color: colors.textSecondary }]}
+                    >
+                      {category.name}
+                    </AppText>
+
                     <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center' }}>
                       {hasLimit ? (
                         <ProgressRing
@@ -234,7 +240,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
-  tileAmount: { fontSize: 10.5, textAlign: 'center', marginTop: 7 },
+  // One line at a fixed size, cut rather than shrunk: a tile that resized its
+  // own text would make the grid read as ragged. Kept muted in every state too,
+  // since the amount below already carries the over-limit warning.
+  tileName: { fontSize: 10, textAlign: 'center', marginBottom: 8, width: '100%' },
+  tileAmount: { fontSize: 10.5, textAlign: 'center', marginTop: 6 },
   addTile: {
     borderRadius: Radius.lg,
     borderWidth: 1.5,

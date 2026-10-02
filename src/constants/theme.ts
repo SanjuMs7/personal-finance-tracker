@@ -20,6 +20,12 @@ export const Spacing = {
 
 /** One fixed colour per icon. Categories must use distinct icons, so this
  * gives every category a stable colour that never shifts as the list changes. */
+/**
+ * One colour per icon, which is what keeps categories apart in the charts.
+ * Chosen to stay legible on both the white and the near-black surface as well
+ * as distinct from each other — a colour picked for contrast between icons
+ * alone can land on a near-black that vanishes in dark mode.
+ */
 export const ICON_COLORS: Record<IconKey, string> = {
   food: '#F5A623',
   groceries: '#16C098',
@@ -38,6 +44,24 @@ export const ICON_COLORS: Record<IconKey, string> = {
   savings: '#0D9488',
   recharge: '#84CC16',
   other: '#64748B',
+  fuel: '#A8A29E',
+  pets: '#C084FC',
+  subscriptions: '#22C55E',
+  clothing: '#DB2777',
+  insurance: '#F97316',
+  kids: '#3B82F6',
+  repairs: '#65A30D',
+  grooming: '#FB923C',
+  laundry: '#E879F9',
+  charity: '#0891B2',
+  tax: '#60A5FA',
+  books: '#94A3B8',
+  music: '#F43F5E',
+  games: '#059669',
+  snacks: '#16A34A',
+  parking: '#CA8A04',
+  furniture: '#14B8A6',
+  loan: '#0284C7',
 };
 
 export const LightColors = {

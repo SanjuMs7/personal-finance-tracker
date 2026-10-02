@@ -8,6 +8,31 @@ export function spentForCategory(categoryId: string, expenses: Expense[], period
     .reduce((sum, e) => sum + e.amount, 0);
 }
 
+/**
+ * The one order the Limits grid and the Home bars both follow, so a category
+ * sits in the same place whichever screen you are on.
+ *
+ * Categories carrying a limit come first, each group runs A-Z, and the
+ * catch-all is pinned to the very end wherever it would otherwise land.
+ * Compared lower-case so a lower-case name is not banished after Z.
+ */
+export function compareForGrid(
+  a: { name: string; icon: IconKey; limit: number | null },
+  b: { name: string; icon: IconKey; limit: number | null }
+): number {
+  const aCatchAll = a.icon === 'other';
+  const bCatchAll = b.icon === 'other';
+  if (aCatchAll !== bCatchAll) return aCatchAll ? 1 : -1;
+
+  const aLimited = a.limit != null;
+  const bLimited = b.limit != null;
+  if (aLimited !== bLimited) return aLimited ? -1 : 1;
+
+  const aName = a.name.toLowerCase();
+  const bName = b.name.toLowerCase();
+  return aName < bName ? -1 : aName > bName ? 1 : 0;
+}
+
 export function statusForPercent(hasLimit: boolean, percent: number): BudgetStatus {
   if (!hasLimit) return 'none';
   if (percent >= BUDGET_THRESHOLDS.danger) return 'danger';

@@ -13,7 +13,7 @@ import { SemiDonutChart, type ChartSegment } from '@/components/charts/SemiDonut
 import { Radius, Spacing } from '@/constants/theme';
 import { usePeriod } from '@/hooks/use-period';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForIcon, limitForPeriod, totalSpending } from '@/lib/calculations/budget';
+import { colorForIcon, compareForGrid, limitForPeriod, totalSpending } from '@/lib/calculations/budget';
 import { isInPeriod } from '@/lib/calculations/period';
 import { formatDateGroupLabel, formatFriendlyTime } from '@/lib/formatting/datetime';
 import { formatMoney } from '@/lib/formatting/money';
@@ -79,23 +79,32 @@ export default function HomeScreen() {
       .filter((s) => s.value > 0);
   }, [categories, periodExpenses, limits, period]);
 
-  // Bars follow the Limits grid's order — limited categories first, newest first
-  // within each group — so a category keeps its slot as you step through months.
+  // Bars follow the Limits grid's order, so a category keeps its slot as you
+  // move between the two screens and as you step through periods.
   const dailyAverages: BarDatum[] = useMemo(() => {
     const byCategory = new Map<string, number>();
     periodExpenses.forEach((e) => byCategory.set(e.categoryId, (byCategory.get(e.categoryId) ?? 0) + e.amount));
-    return [...categories]
-      .sort(
-        (a, b) =>
-          Number(limitForPeriod(limits, b.id, period) != null) -
-          Number(limitForPeriod(limits, a.id, period) != null)
+    return categories
+      .map((category) => ({
+        category,
+        limit: limitForPeriod(limits, category.id, period),
+        value: Math.round((byCategory.get(category.id) ?? 0) / nav.elapsed),
+      }))
+      // A category with nothing spent has no average worth a column, and
+      // dropping it leaves the rest wide enough to label.
+      .filter((row) => row.value > 0)
+      .sort((a, b) =>
+        compareForGrid(
+          { name: a.category.name, icon: a.category.icon, limit: a.limit },
+          { name: b.category.name, icon: b.category.icon, limit: b.limit }
+        )
       )
-      .map((c) => ({
-        key: c.id,
-        label: c.name,
-        icon: c.icon,
-        color: colorForIcon(c.icon),
-        value: Math.round((byCategory.get(c.id) ?? 0) / nav.elapsed),
+      .map(({ category, value }) => ({
+        key: category.id,
+        label: category.name,
+        icon: category.icon,
+        color: colorForIcon(category.icon),
+        value,
       }));
   }, [categories, periodExpenses, nav.elapsed, limits, period]);
 
@@ -160,7 +169,7 @@ export default function HomeScreen() {
                   data={dailyAverages}
                   total={Math.round(total / nav.elapsed)}
                   caption={`Average per day · ${nav.elapsed} ${nav.elapsed === 1 ? 'day' : 'days'}`}
-                  width={width - Spacing.xl * 2 - 40}
+                  width={width - Spacing.xl * 2 - 24}
                   trackColor={colors.trackColor}
                   textColor={colors.textPrimary}
                   secondaryTextColor={colors.textSecondary}
@@ -257,7 +266,7 @@ const styles = StyleSheet.create({
   chartCard: {
     borderRadius: Radius.lg,
     paddingVertical: 28,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     marginBottom: Spacing.xl,
     alignItems: 'center',
     shadowOpacity: 0.06,

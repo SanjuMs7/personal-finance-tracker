@@ -15,7 +15,25 @@ export type IconKey =
   | 'gift'
   | 'savings'
   | 'recharge'
-  | 'other';
+  | 'other'
+  | 'fuel'
+  | 'pets'
+  | 'subscriptions'
+  | 'clothing'
+  | 'insurance'
+  | 'kids'
+  | 'repairs'
+  | 'grooming'
+  | 'laundry'
+  | 'charity'
+  | 'tax'
+  | 'books'
+  | 'music'
+  | 'games'
+  | 'snacks'
+  | 'parking'
+  | 'furniture'
+  | 'loan';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
