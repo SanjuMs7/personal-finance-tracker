@@ -77,13 +77,14 @@ export default function LimitsScreen() {
     [categories, expenses, limits, period]
   );
 
-  // Header summary covers only the categories that actually carry a limit —
-  // unlimited spending has nothing to be measured against.
+  // Spending counts everything, limits only what carries one — so the first
+  // figure can exceed the second once an unlimited category has any spend.
+  // Hidden entirely when nothing has a limit, where there is nothing to measure.
   const summary = useMemo(() => {
     const limited = ordered.filter((c) => c.limit != null && c.limit > 0);
     if (limited.length === 0) return null;
     return {
-      spent: limited.reduce((sum, c) => sum + c.spent, 0),
+      spent: ordered.reduce((sum, c) => sum + c.spent, 0),
       limit: limited.reduce((sum, c) => sum + (c.limit as number), 0),
     };
   }, [ordered]);
@@ -174,7 +175,9 @@ export default function LimitsScreen() {
                         { color: category.status === 'danger' ? colors.danger : colors.textSecondary },
                       ]}
                     >
-                      {hasLimit ? `${formatMoney(category.spent)} / ${formatMoney(category.limit as number)}` : 'No limit'}
+                      {hasLimit
+                        ? `${formatMoney(category.spent)} / ${formatMoney(category.limit as number)}`
+                        : `${formatMoney(category.spent)} spent`}
                     </AppText>
                   </View>
                 </Pressable>
